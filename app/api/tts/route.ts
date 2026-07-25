@@ -6,6 +6,7 @@ type MiniMaxEmotion = "calm" | "happy";
 
 type RuntimeEnv = {
   MINIMAX_API_KEY?: string;
+  MINIMAX_API_BASE?: string;
   MINIMAX_VOICE_PEI?: string;
   MINIMAX_VOICE_CHI?: string;
   MINIMAX_VOICE_YAN?: string;
@@ -118,7 +119,10 @@ export async function POST(request: Request) {
 
   let upstream: Response;
   try {
-    upstream = await fetch("https://api.minimaxi.com/v1/t2a_v2", {
+    const apiBase =
+      runtime.MINIMAX_API_BASE?.trim().replace(/\/$/, "") ??
+      "https://api.minimax.io";
+    upstream = await fetch(`${apiBase}/v1/t2a_v2`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
