@@ -187,11 +187,11 @@ const CHARACTERS: Record<CharacterId, CharacterProfile> = {
   },
   yan: {
     id: "yan",
-    name: "晏无咎",
+    name: "谢临渊",
     age: 30,
     archetype: "危险掌控",
     role: "禁梦拍卖师",
-    image: "/yan-wujiu.png",
+    image: "/xie-linyuan.png",
     accent: "#b36d63",
     accentSoft: "rgba(179, 109, 99, 0.16)",
     heroTitle: "别逞强。你藏得没那么好。",

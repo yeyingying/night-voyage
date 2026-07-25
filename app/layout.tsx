@@ -25,7 +25,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const base = new URL(`${protocol}://${host}`);
   const title = "夜航恋人｜四种心动，四种陪伴";
   const description =
-    "每一次晚安，都是与你重逢。选择裴叙白、迟曜、晏无咎或陆听澜，体验不同性格、声线与熄屏哄睡。";
+    "每一次晚安，都是与你重逢。选择裴叙白、迟曜、谢临渊或陆听澜，体验不同性格、声线与熄屏哄睡。";
   const socialImage = new URL("/og.png", base).toString();
 
   return {
