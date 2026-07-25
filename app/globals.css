@@ -951,6 +951,18 @@ input:focus-visible {
   color: #fff8e9;
 }
 
+.reply-thinking p {
+  color: #7f8a9b;
+  font-size: 10px;
+  animation: reply-breathe 1.6s ease-in-out infinite;
+}
+
+@keyframes reply-breathe {
+  50% {
+    opacity: 0.55;
+  }
+}
+
 .safety-card {
   margin: 16px 0;
   padding: 15px;
@@ -1001,6 +1013,11 @@ input:focus-visible {
 
 .composer input::placeholder {
   color: #5e6878;
+}
+
+.composer input:disabled {
+  cursor: wait;
+  opacity: 0.72;
 }
 
 .composer button,

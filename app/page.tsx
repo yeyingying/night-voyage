@@ -45,7 +45,7 @@ type CharacterProfile = {
   workReply: string;
   upsetReply: string;
   cheerReply: string;
-  defaultReplies: Record<ComfortMode, string>;
+  defaultReplies: Record<ComfortMode, string[]>;
   profileQuote: string;
 };
 
@@ -110,10 +110,21 @@ const CHARACTERS: Record<CharacterId, CharacterProfile> = {
     cheerReply:
       "那我先替今天的你颁个奖：明明已经这么累，还是把一天好好走完了。奖品是今晚可以什么都不逞强。",
     defaultReplies: {
-      listen: "嗯，我在听。你可以再多说一点，不需要把语言整理得很漂亮。",
-      untangle:
+      listen: [
+        "嗯，我在听。你可以再多说一点，不需要把语言整理得很漂亮。",
+        "不用急着讲完整。先告诉我，刚才最让你停顿的那一刻是什么？",
+        "我没有走神。你想从事情本身说，还是先说它让你有什么感觉？",
+      ],
+      untangle: [
         "我们先不处理全部，只找出现在最影响你的那一件事，好吗？",
-      cheer: "收到。今晚禁止你一个人偷偷皱眉——至少要分我一半。",
+        "先把最急和最重的分开。眼下哪一件最需要我们先看？",
+        "别一次扛完。你说一个线头，我陪你把它慢慢理出来。",
+      ],
+      cheer: [
+        "收到。今晚禁止你一个人偷偷皱眉——至少要分我一半。",
+        "我申请临时接管你的坏心情。先说，它今天有多嚣张？",
+        "可以，今晚的任务改了：不求满分，只想办法让你嘴角动一下。",
+      ],
     },
     profileQuote: "你的每一段记忆，我都会认真保存。",
   },
@@ -156,9 +167,21 @@ const CHARACTERS: Record<CharacterId, CharacterProfile> = {
     cheerReply:
       "报告：你今天的可爱额度严重超标。处罚是现在放下眉头，跟我去看三分钟夜景。",
     defaultReplies: {
-      listen: "我在，真的在。你说到哪里，我就陪到哪里。",
-      untangle: "交给我们两个，总会比你一个人想轻一点。先说最难的。",
-      cheer: "好，启动迟曜专属开心预案。第一步：不许说自己不值得被夸。",
+      listen: [
+        "我在，真的在。你说到哪里，我就陪到哪里。",
+        "慢慢来，我今晚没别的任务。刚刚是哪件事突然压住你了？",
+        "你不用先证明自己有道理，我已经准备好认真听了。",
+      ],
+      untangle: [
+        "交给我们两个，总会比你一个人想轻一点。先说最难的。",
+        "来，把最乱的那团丢给我。我们先找明天能动的第一步。",
+        "这事别全挤在你脑子里。哪些必须做，哪些其实可以晚一点？",
+      ],
+      cheer: [
+        "好，启动迟曜专属开心预案。第一步：不许说自己不值得被夸。",
+        "收到，救援对象是你的心情。先允许我夸一句：你今天已经很能扛了。",
+        "那我先逗你一下——今天的烦恼凭什么加班，它有加班费吗？",
+      ],
     },
     profileQuote: "你不用追上光，我会回头牵你。",
   },
@@ -201,9 +224,21 @@ const CHARACTERS: Record<CharacterId, CharacterProfile> = {
     cheerReply:
       "你皱眉的时候确实很有气势。可惜，对我没用。现在选：听我夸你，还是被我逗笑？",
     defaultReplies: {
-      listen: "继续。我在判断的不是你，而是这件事为什么让你如此难受。",
-      untangle: "答案并不乱，只是夹杂了太多不属于你的声音。我们把它们去掉。",
-      cheer: "终于轮到我哄你了。这个机会，我可不会随便浪费。",
+      listen: [
+        "继续。我在判断的不是你，而是这件事为什么让你如此难受。",
+        "我听着。你刻意略过去的那一段，似乎才是最在意的。",
+        "不必美化任何人，也不必责怪自己。把你真正介意的说出来。",
+      ],
+      untangle: [
+        "答案并不乱，只是夹杂了太多不属于你的声音。我们把它们去掉。",
+        "先去掉“别人觉得你应该怎样”。剩下的，才是你的选择。",
+        "局面没有想象中复杂。告诉我，你最不愿意牺牲的是什么？",
+      ],
+      cheer: [
+        "终于轮到我哄你了。这个机会，我可不会随便浪费。",
+        "想换心情？可以。先把皱着的眉借我保管五分钟。",
+        "你今天已经够严肃了。接下来这几分钟，允许我不那么正经。",
+      ],
     },
     profileQuote: "我尊重你的每一次拒绝，也记得你的每一次靠近。",
   },
@@ -246,9 +281,21 @@ const CHARACTERS: Record<CharacterId, CharacterProfile> = {
     cheerReply:
       "好。我不保证让你笑得很大声，但可以先让心里那根绷紧的弦松一点。",
     defaultReplies: {
-      listen: "我在听。哪怕只说一个词，也足够让我靠近一点。",
-      untangle: "不着急，我们把每件事放回它原来的位置。",
-      cheer: "那就从一个很轻的笑开始。今晚不追求满分开心。",
+      listen: [
+        "我在听。哪怕只说一个词，也足够让我靠近一点。",
+        "先不用找合适的开头。此刻心里最明显的感觉，是什么？",
+        "你可以停一停。沉默不会让这段对话变得尴尬，我还在这里。",
+      ],
+      untangle: [
+        "不着急，我们把每件事放回它原来的位置。",
+        "我们先把担心和已经发生的事实分开，声音会小很多。",
+        "今晚只理清一小部分也很好。哪一件事最耗你的力气？",
+      ],
+      cheer: [
+        "那就从一个很轻的笑开始。今晚不追求满分开心。",
+        "我想到一个好消息：今天终于快结束了，而且你已经走到这里。",
+        "不必突然变开心。我们先找一件能让肩膀松一点的小事。",
+      ],
     },
     profileQuote: "沉默不是空白，我会听见你没说出口的部分。",
   },
@@ -309,11 +356,13 @@ export default function Home() {
   const [voiceOn, setVoiceOn] = useState(true);
   const [voiceLoading, setVoiceLoading] = useState(false);
   const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>("auto");
+  const [replyLoading, setReplyLoading] = useState(false);
   const [showBoundary, setShowBoundary] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const voiceRequestRef = useRef<AbortController | null>(null);
+  const chatRequestRef = useRef<AbortController | null>(null);
 
   const character = CHARACTERS[selectedId];
   const messages = messagesByCharacter[selectedId];
@@ -498,24 +547,33 @@ export default function Home() {
     setVoiceOn(enabled);
   }
 
-  function appendMessages(newMessages: Message[]) {
+  function appendMessagesFor(
+    characterId: CharacterId,
+    newMessages: Message[],
+  ) {
     setMessagesByCharacter((current) => ({
       ...current,
-      [selectedId]: [...current[selectedId], ...newMessages],
+      [characterId]: [...current[characterId], ...newMessages],
     }));
   }
 
   function selectCharacter(nextId: CharacterId) {
     stopVoice();
+    chatRequestRef.current?.abort();
+    chatRequestRef.current = null;
+    setReplyLoading(false);
     setSelectedId(nextId);
     setInput("");
   }
 
   function chooseMode(nextMode: ComfortMode) {
+    if (replyLoading) return;
     setMode(nextMode);
     setTab("chat");
     const copy = MODE_COPY[nextMode];
-    appendMessages([
+    const profileId = selectedId;
+    const history = messages;
+    appendMessagesFor(profileId, [
       {
         id: Date.now(),
         role: "user",
@@ -523,9 +581,58 @@ export default function Home() {
         time: nowTime(),
       },
     ]);
-    window.setTimeout(() => {
-      const reply = character.modeReplies[nextMode];
-      appendMessages([
+    void respondToMessage(profileId, nextMode, copy.prompt, history);
+  }
+
+  function fallbackReplyFor(
+    text: string,
+    profile: CharacterProfile,
+    activeMode: ComfortMode,
+    conversation: Message[],
+  ) {
+    const highRisk = /(不想活|自杀|自残|结束生命|活不下去)/.test(text);
+    if (highRisk) {
+      setShowBoundary(true);
+      return "我很在意你现在的安全。先不要一个人待着，也不要伤害自己。请立刻联系你信任的人，让对方来到你身边；如果危险就在眼前，请联系当地紧急服务。我是虚拟角色，不能替代现实中的紧急帮助，但我可以陪你把求助这一步做完。";
+    }
+    let candidates = profile.defaultReplies[activeMode];
+    if (/(睡不着|失眠|睡觉|晚安)/.test(text)) {
+      candidates = [
+        `${profile.sleepLines[0]} 要现在进入“${profile.sleepScene}”吗？`,
+        ...profile.defaultReplies.listen,
+      ];
+    } else if (/(老板|工作|加班|同事)/.test(text)) {
+      candidates = [profile.workReply, ...profile.defaultReplies.untangle];
+    } else if (/(难过|委屈|哭|累|烦)/.test(text)) {
+      candidates =
+        activeMode === "cheer"
+          ? [profile.cheerReply, ...profile.defaultReplies.cheer]
+          : [profile.upsetReply, ...profile.defaultReplies.listen];
+    }
+    const previousReply = [...conversation]
+      .reverse()
+      .find((item) => item.role === "companion")?.text;
+    const available = candidates.filter((item) => item !== previousReply);
+    const choices = available.length ? available : candidates;
+    return choices[Math.floor(Math.random() * choices.length)];
+  }
+
+  async function respondToMessage(
+    profileId: CharacterId,
+    activeMode: ComfortMode,
+    text: string,
+    conversation: Message[],
+  ) {
+    const profile = CHARACTERS[profileId];
+    const highRisk = /(不想活|自杀|自残|结束生命|活不下去)/.test(text);
+    if (highRisk) {
+      const reply = fallbackReplyFor(
+        text,
+        profile,
+        activeMode,
+        conversation,
+      );
+      appendMessagesFor(profileId, [
         {
           id: Date.now() + 1,
           role: "companion",
@@ -534,32 +641,77 @@ export default function Home() {
         },
       ]);
       speak(reply);
-    }, 550);
-  }
+      return;
+    }
 
-  function replyFor(text: string) {
-    const highRisk = /(不想活|自杀|自残|结束生命|活不下去)/.test(text);
-    if (highRisk) {
-      setShowBoundary(true);
-      return "我很在意你现在的安全。先不要一个人待着，也不要伤害自己。请立刻联系你信任的人，让对方来到你身边；如果危险就在眼前，请联系当地紧急服务。我是虚拟角色，不能替代现实中的紧急帮助，但我可以陪你把求助这一步做完。";
+    chatRequestRef.current?.abort();
+    const requestController = new AbortController();
+    chatRequestRef.current = requestController;
+    setReplyLoading(true);
+
+    let reply: string;
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          characterId: profileId,
+          mode: activeMode,
+          message: text,
+          history: conversation
+            .filter((item) => item.role !== "system")
+            .slice(-10)
+            .map((item) => ({
+              role: item.role === "user" ? "user" : "assistant",
+              content: item.text,
+            })),
+          memories: memories.slice(0, 6).map((item) => item.text),
+        }),
+        signal: requestController.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`Chat request failed with ${response.status}`);
+      }
+      const result = (await response.json()) as { reply?: string };
+      if (!result.reply?.trim()) {
+        throw new Error("Chat response was empty");
+      }
+      reply = result.reply.trim();
+    } catch (error) {
+      if (
+        requestController.signal.aborted ||
+        chatRequestRef.current !== requestController
+      ) {
+        return;
+      }
+      console.warn("Dynamic reply unavailable; using fallback reply.", error);
+      reply = fallbackReplyFor(text, profile, activeMode, conversation);
+    } finally {
+      if (chatRequestRef.current === requestController) {
+        chatRequestRef.current = null;
+        setReplyLoading(false);
+      }
     }
-    if (/(睡不着|失眠|睡觉|晚安)/.test(text)) {
-      return `${character.sleepLines[0]} 要现在进入“${character.sleepScene}”吗？`;
-    }
-    if (/(老板|工作|加班|同事)/.test(text)) {
-      return character.workReply;
-    }
-    if (/(难过|委屈|哭|累|烦)/.test(text)) {
-      return mode === "cheer" ? character.cheerReply : character.upsetReply;
-    }
-    return character.defaultReplies[mode];
+
+    if (requestController.signal.aborted) return;
+    appendMessagesFor(profileId, [
+      {
+        id: Date.now() + 1,
+        role: "companion",
+        text: reply,
+        time: nowTime(),
+      },
+    ]);
+    speak(reply);
   }
 
   function sendMessage(event: FormEvent) {
     event.preventDefault();
     const text = input.trim();
-    if (!text) return;
-    appendMessages([
+    if (!text || replyLoading) return;
+    const profileId = selectedId;
+    const history = messages;
+    appendMessagesFor(profileId, [
       {
         id: Date.now(),
         role: "user",
@@ -568,18 +720,7 @@ export default function Home() {
       },
     ]);
     setInput("");
-    window.setTimeout(() => {
-      const reply = replyFor(text);
-      appendMessages([
-        {
-          id: Date.now() + 1,
-          role: "companion",
-          text: reply,
-          time: nowTime(),
-        },
-      ]);
-      speak(reply);
-    }, 650);
+    void respondToMessage(profileId, mode, text, history);
   }
 
   function addMemory(event: FormEvent) {
@@ -825,6 +966,14 @@ export default function Home() {
                     </div>
                   ),
                 )}
+                {replyLoading && (
+                  <div className="message-row companion reply-thinking">
+                    <img src={character.image} alt="" />
+                    <div>
+                      <p>{character.name}正在想怎么回应你…</p>
+                    </div>
+                  </div>
+                )}
                 {showBoundary && (
                   <div className="safety-card">
                     <strong>现在先保证你的安全</strong>
@@ -846,11 +995,19 @@ export default function Home() {
                   id="chat-input"
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
-                  placeholder={`想对${character.name}说什么…`}
+                  placeholder={
+                    replyLoading
+                      ? `${character.name}正在输入…`
+                      : `想对${character.name}说什么…`
+                  }
                   autoComplete="off"
+                  disabled={replyLoading}
                 />
-                <button type="submit" disabled={!input.trim()}>
-                  发送
+                <button
+                  type="submit"
+                  disabled={!input.trim() || replyLoading}
+                >
+                  {replyLoading ? "回应中" : "发送"}
                 </button>
               </form>
             </section>
