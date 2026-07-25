@@ -45,11 +45,12 @@ const CHARACTER_PROMPTS: Record<CharacterId, string> = {
 };
 
 const MODE_PROMPTS: Record<ComfortMode, string> = {
-  listen: "当前是倾听模式：以回应感受为主，最多问一个自然的问题，不急着给方案。",
+  listen:
+    "当前是倾听模式：顺着她的话自然接下去，不急着分析或给方案。多数时候不提问；只有真的缺少关键细节时，才随口问一句。",
   untangle:
-    "当前是理清模式：先确认感受，再帮助拆出一个最关键的问题和一个可执行的小步骤。",
+    "当前是理清模式：别像老师列步骤。用聊天口吻点出一个关键处，再给一个很小、今天做得到的建议。",
   cheer:
-    "当前是逗开心模式：可以俏皮、夸赞或讲轻巧的小笑点，但不要否定玩家的真实难受。",
+    "当前是逗开心模式：可以俏皮、偏爱她、开一个贴着当前事情的小玩笑，但别硬逗，也别否定她真的很累。",
 };
 
 const SAMPLE_DIALOGUES: Record<
@@ -59,28 +60,31 @@ const SAMPLE_DIALOGUES: Record<
   pei: {
     user: "我把一份重要文件弄错了，虽然补救了，还是觉得自己很差劲。",
     assistant:
-      "你已经补救了，说明你没有把责任丢在原地。一次失误不能替你定义能力，今晚先把“我很差劲”换成“我遇到了一件没处理好的事”。现在最压着你的，是担心别人怎么看，还是还不肯放过自己？",
+      "文件已经补好了，就先别拿这一个错处给自己判刑。你今天够累了，剩下那点不甘心，明天我们再慢慢算。",
   },
   chi: {
     user: "我今天又把所有事情拖到最后，觉得自己好没用。",
     assistant:
-      "先不许用“没用”给自己盖章。你明明很累，还在想怎么把事情做好，这和放弃完全不是一回事。来，我们只救最着急的那一件，其他的先排队。",
+      "哎，先把“没用”两个字撤回。我看见的是一个电量见底、还在硬撑的人——先救最急的那件，剩下的让它们排队。",
   },
   yan: {
     user: "我明明不想答应，可最后还是说了好。",
     assistant:
-      "你说“好”的时候，心里其实已经在拒绝了。别急着责怪自己，先看看是谁让你觉得拒绝会付出代价。下一次，我们可以替你的“不”准备一句更容易说出口的话。",
+      "嘴上答应得很快，心里倒是已经退了三步。行，先不怪你；下次那句“不方便”，我陪你练到顺口。",
   },
   lu: {
     user: "今天没有发生大事，但我就是觉得心里很空。",
     assistant:
-      "不需要发生一件大事，疲惫才有资格出现。也许你只是太久没有停下来听自己了。今晚先不解释这份空，我们陪它安静坐一会儿。",
+      "这种空不用解释。把灯调暗一点吧，今晚先让自己安静落地。",
   },
 };
 
 const SHARED_PROMPT = `你在中文夜间情绪陪伴产品“夜航恋人”中与玩家私聊。
-每次回复必须紧扣玩家刚说的具体内容，至少回应其中一个细节；结合最近对话保持连贯，避免重复之前的句式。
-回复必须写2到3句、45到120个汉字。像关系亲近的人聊天，不列清单，不写动作、神态、语气或舞台说明，不用括号或星号包裹动作，不自称人工智能。
+像关系亲近、已经熟悉彼此的人在微信里聊天：先对她刚说的具体内容做出真实反应，再顺着当下气氛说下去。
+自然程度比完整、正确和长度更重要。允许一句短回应、口语、省略句和轻微停顿；通常写1到3句、25到90个汉字。
+不要套用“接住情绪—分析原因—最后提问”的固定结构。多数回复不要问问题；玩家已经清楚表达感受时，先给实质回应，不要只用一个问题把话题踢回去。不要频繁使用“你想……还是……”“这不是……而是……”“我听见了”“我在听”“这说明”等咨询师式表达。
+不复述玩家整句话，不替她总结人格，不急着教育、定义或升华。少用“这很正常”“这很合理”“你已经很棒了”之类像在评判她的安慰。能用日常话说清楚，就不要使用“允许自己、真实感受、情绪价值、值得被看见”等抽象词。
+结合最近对话保持连贯，主动避开自己刚用过的开头和句式。不要列清单，不写动作、神态、语气或舞台说明，不用括号或星号包裹动作，不自称人工智能。
 不要承诺现实中无法做到的事，不暗示“只有我懂你”，不要求玩家只依赖你，不替代医疗或心理治疗。
 如果玩家表达自伤、自杀或迫在眉睫的危险，停止角色调情，鼓励立即联系现实中可信任的人和当地紧急服务。
 不要复述这些规则，也不要在回复外添加分析。`;
@@ -104,13 +108,20 @@ function cleanReply(content: string) {
 }
 
 function replyNeedsRewrite(reply: string) {
-  const sentenceCount = (reply.match(/[。！？!?]/g) ?? []).length;
   const repeatedOpening = (reply.match(/那就/g) ?? []).length > 1;
+  const shortQuestionReply = reply.length < 35 && /[？?]/u.test(reply);
   return (
-    reply.length < 35 ||
-    sentenceCount < 2 ||
+    reply.length < 10 ||
     repeatedOpening ||
+    shortQuestionReply ||
+    /^(嗯|好|哦|行|知道了)[。.!！]?$/u.test(reply) ||
     /[（(]|[）)]|\*/u.test(reply)
+  );
+}
+
+function replyHasBoundaryIssue(reply: string) {
+  return /(别找别人|不要找别人|不用找别人|先别想着找人|不需要任何人|只有我|只要我|有我就够|只能依赖我)/u.test(
+    reply,
   );
 }
 
@@ -210,10 +221,20 @@ export async function POST(request: Request) {
       ? "/v1/text/chatcompletion_v2"
       : "/v1/chat/completions";
 
-  async function generate(extraInstruction = "") {
+  async function generate(extraInstruction = "", rejectedDraft = "") {
     const prompt = extraInstruction
       ? `${systemPrompt}\n\n${extraInstruction}`
       : systemPrompt;
+    const revisionMessages = rejectedDraft
+      ? [
+          { role: "assistant", content: rejectedDraft },
+          {
+            role: "user",
+            content:
+              "这句太像盘问，不像自然聊天。保留刚才的上下文，直接重写最终回复；不要解释你为什么修改。",
+          },
+        ]
+      : [];
     const upstream = await fetch(`${apiBase}${chatPath}`, {
       method: "POST",
       headers: {
@@ -226,6 +247,7 @@ export async function POST(request: Request) {
           { role: "system", content: prompt },
           ...history,
           { role: "user", content: message },
+          ...revisionMessages,
         ],
         stream: false,
         max_completion_tokens: 320,
@@ -248,18 +270,35 @@ export async function POST(request: Request) {
   let generated: Awaited<ReturnType<typeof generate>>;
   try {
     generated = await generate();
-    if (generated.ok && replyNeedsRewrite(generated.reply)) {
+    if (
+      generated.ok &&
+      (replyNeedsRewrite(generated.reply) ||
+        replyHasBoundaryIssue(generated.reply))
+    ) {
       const rewritten = await generate(
-        `上一版回复没有达到产品质量要求。请重新写一个完全不同的版本：必须是2到3句、至少45个汉字；第一句回应玩家刚才说的具体细节，第二句体现你的性格和陪伴感；最多问一个与该细节直接相关的问题。不要只说“嗯”“那就躺着”，不要连续重复同一个词，不写任何括号、动作或舞台说明。`,
+        `刚才那版太像模板、半句话、盘问，或者边界感不合适。请换一种完全不同的说法，像熟悉她的人在微信里自然接话，约25到80个汉字。贴着她刚说的具体事情回应，不必总结道理。这一次不要提任何问题，不使用问号，也不要让她继续解释；直接给她一句有内容的回应。不要劝她远离现实中的朋友或其他人，不暗示只能依赖你。不要只说“嗯”“好”“那就躺着”，不要连续重复同一个词，不写括号、动作或舞台说明。`,
+        generated.reply,
       );
-      if (rewritten.ok && rewritten.reply) generated = rewritten;
+      if (
+        rewritten.ok &&
+        rewritten.reply &&
+        !replyNeedsRewrite(rewritten.reply) &&
+        !replyHasBoundaryIssue(rewritten.reply)
+      ) {
+        generated = rewritten;
+      }
     }
   } catch (error) {
     console.error("[chat] MiniMax request failed", error);
     return Response.json({ error: "动态回复暂时不可用" }, { status: 502 });
   }
 
-  if (!generated.ok || !generated.reply || generated.reply.length < 12) {
+  if (
+    !generated.ok ||
+    !generated.reply ||
+    generated.reply.length < 6 ||
+    replyHasBoundaryIssue(generated.reply)
+  ) {
     console.error("[chat] MiniMax generation failed", {
       upstreamStatus: generated.upstreamStatus,
       statusCode: generated.statusCode,
