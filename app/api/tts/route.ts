@@ -25,20 +25,20 @@ type MiniMaxResponse = {
 };
 
 const DEFAULT_VOICES: Record<CharacterId, string> = {
-  pei: "Chinese (Mandarin)_Reliable_Executive",
-  chi: "ttv-voice-2026072523103226-Ps97BrCs",
-  yan: "ttv-voice-2026072523104626-M4ZyY4Z1",
-  lu: "ttv-voice-2026072523111126-Ase2NkMO",
+  pei: "ttv-voice-2026072523240526-Omu0wD2C",
+  chi: "ttv-voice-2026072523425526-j8spGMFf",
+  yan: "ttv-voice-2026072523430526-zZfm7sFe",
+  lu: "ttv-voice-2026072523425726-5po0jdg9",
 };
 
 const VOICE_SETTINGS: Record<
   CharacterId,
   { speed: number; pitch: number; emotion: MiniMaxEmotion }
 > = {
-  pei: { speed: 0.92, pitch: -1, emotion: "calm" },
-  chi: { speed: 1.02, pitch: 0, emotion: "calm" },
-  yan: { speed: 0.96, pitch: 1, emotion: "calm" },
-  lu: { speed: 0.94, pitch: 0, emotion: "calm" },
+  pei: { speed: 0.94, pitch: 0, emotion: "calm" },
+  chi: { speed: 1.01, pitch: 0, emotion: "calm" },
+  yan: { speed: 0.98, pitch: 0, emotion: "calm" },
+  lu: { speed: 0.96, pitch: 0, emotion: "calm" },
 };
 
 const CHARACTER_IDS = new Set<CharacterId>(["pei", "chi", "yan", "lu"]);
@@ -114,7 +114,7 @@ export async function POST(request: Request) {
   }
 
   const voice = VOICE_SETTINGS[characterId];
-  const model = scene === "sleep" ? "speech-2.8-hd" : "speech-2.8-turbo";
+  const model = "speech-2.8-hd";
   const preparedText = scene === "sleep" ? sleepPacing(text) : text;
 
   let upstream: Response;
