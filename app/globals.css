@@ -478,6 +478,12 @@ input:focus-visible {
   cursor: pointer;
 }
 
+.voice-preview-row > button:disabled,
+.profile-settings button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
 .section-heading {
   display: flex;
   align-items: flex-end;

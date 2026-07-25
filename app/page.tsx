@@ -12,6 +12,7 @@ import {
 type Tab = "tonight" | "chat" | "memory" | "profile";
 type ComfortMode = "listen" | "untangle" | "cheer";
 type CharacterId = "pei" | "chi" | "yan" | "lu";
+type VoiceProvider = "auto" | "natural" | "device";
 type Message = {
   id: number;
   role: "companion" | "user" | "system";
@@ -306,8 +307,13 @@ export default function Home() {
   const [sleepLine, setSleepLine] = useState(0);
   const [memoryDraft, setMemoryDraft] = useState("");
   const [voiceOn, setVoiceOn] = useState(true);
+  const [voiceLoading, setVoiceLoading] = useState(false);
+  const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>("auto");
   const [showBoundary, setShowBoundary] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
+  const voiceRequestRef = useRef<AbortController | null>(null);
 
   const character = CHARACTERS[selectedId];
   const messages = messagesByCharacter[selectedId];
@@ -377,7 +383,7 @@ export default function Home() {
   useEffect(() => {
     if (!sleeping || !voiceOn || typeof window === "undefined") return;
     speak(character.sleepLines[sleepLine], true);
-    return () => window.speechSynthesis.cancel();
+    return stopVoice;
   }, [character, sleepLine, sleeping, voiceOn]);
 
   const clock = useMemo(() => {
@@ -388,8 +394,27 @@ export default function Home() {
     return `${minutes}:${seconds}`;
   }, [secondsLeft]);
 
-  function speak(text: string, sleepVoice = false) {
-    if (!voiceOn || typeof window === "undefined") return;
+  function releaseAudio() {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+      audioRef.current = null;
+    }
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current);
+      audioUrlRef.current = null;
+    }
+  }
+
+  function stopVoice() {
+    voiceRequestRef.current?.abort();
+    voiceRequestRef.current = null;
+    releaseAudio();
+    window.speechSynthesis?.cancel();
+    setVoiceLoading(false);
+  }
+
+  function fallbackSpeak(text: string, sleepVoice = false) {
     window.speechSynthesis.cancel();
     const phrase = new SpeechSynthesisUtterance(text);
     const chineseVoices = window.speechSynthesis
@@ -408,6 +433,71 @@ export default function Home() {
     window.speechSynthesis.speak(phrase);
   }
 
+  async function playNaturalVoice(text: string, sleepVoice = false) {
+    stopVoice();
+    const requestController = new AbortController();
+    voiceRequestRef.current = requestController;
+    setVoiceLoading(true);
+
+    try {
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text,
+          characterId: character.id,
+          scene: sleepVoice ? "sleep" : "chat",
+        }),
+        signal: requestController.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`TTS request failed with ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      if (!blob.size || voiceRequestRef.current !== requestController) return;
+
+      const audioUrl = URL.createObjectURL(blob);
+      const audio = new Audio(audioUrl);
+      audio.volume = sleepVoice ? 0.76 : 0.92;
+      audio.preload = "auto";
+      audioRef.current = audio;
+      audioUrlRef.current = audioUrl;
+      setVoiceProvider("natural");
+
+      audio.onended = releaseAudio;
+      audio.onerror = releaseAudio;
+      await audio.play();
+    } catch (error) {
+      if (
+        requestController.signal.aborted ||
+        voiceRequestRef.current !== requestController
+      ) {
+        return;
+      }
+      console.warn("Natural voice unavailable; using device voice.", error);
+      releaseAudio();
+      setVoiceProvider("device");
+      fallbackSpeak(text, sleepVoice);
+    } finally {
+      if (voiceRequestRef.current === requestController) {
+        voiceRequestRef.current = null;
+        setVoiceLoading(false);
+      }
+    }
+  }
+
+  function speak(text: string, sleepVoice = false) {
+    if (!voiceOn || typeof window === "undefined") return;
+    void playNaturalVoice(text, sleepVoice);
+  }
+
+  function setVoiceEnabled(enabled: boolean) {
+    if (!enabled) stopVoice();
+    setVoiceOn(enabled);
+  }
+
   function appendMessages(newMessages: Message[]) {
     setMessagesByCharacter((current) => ({
       ...current,
@@ -416,7 +506,7 @@ export default function Home() {
   }
 
   function selectCharacter(nextId: CharacterId) {
-    window.speechSynthesis?.cancel();
+    stopVoice();
     setSelectedId(nextId);
     setInput("");
   }
@@ -513,7 +603,7 @@ export default function Home() {
   function closeSleep() {
     setSleeping(false);
     setSleepOpen(false);
-    window.speechSynthesis?.cancel();
+    stopVoice();
   }
 
   return (
@@ -543,7 +633,7 @@ export default function Home() {
             <button
               className="icon-button"
               type="button"
-              onClick={() => setVoiceOn((current) => !current)}
+              onClick={() => setVoiceEnabled(!voiceOn)}
               aria-label={voiceOn ? "关闭语音" : "打开语音"}
               title={voiceOn ? "关闭语音" : "打开语音"}
             >
@@ -609,8 +699,9 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => speak(character.voicePreview)}
+                    disabled={voiceLoading}
                   >
-                    试听声线
+                    {voiceLoading ? "正在生成…" : "试听声线"}
                   </button>
                 </div>
               </section>
@@ -854,18 +945,27 @@ export default function Home() {
                   <input
                     type="checkbox"
                     checked={voiceOn}
-                    onChange={(event) => setVoiceOn(event.target.checked)}
+                    onChange={(event) =>
+                      setVoiceEnabled(event.target.checked)
+                    }
                   />
                 </label>
                 <button
                   type="button"
                   onClick={() => speak(character.voicePreview)}
+                  disabled={voiceLoading}
                 >
                   <span>
                     <strong>试听{character.name}的声线</strong>
-                    <small>使用设备内置中文语音演示</small>
+                    <small>
+                      {voiceProvider === "natural"
+                        ? "MiniMax 自然中文声线"
+                        : voiceProvider === "device"
+                          ? "自然声线未配置，当前为设备声线"
+                          : "优先使用 MiniMax 自然中文声线"}
+                    </small>
                   </span>
-                  <b>播放</b>
+                  <b>{voiceLoading ? "生成中" : "播放"}</b>
                 </button>
                 <button type="button" onClick={() => setTab("memory")}>
                   <span>
@@ -934,7 +1034,7 @@ export default function Home() {
             <div className="sleep-controls">
               <button
                 type="button"
-                onClick={() => setVoiceOn((current) => !current)}
+                onClick={() => setVoiceEnabled(!voiceOn)}
               >
                 {voiceOn ? "语音开启" : "语音关闭"}
               </button>
