@@ -1,12 +1,20 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  CSSProperties,
+  FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 type Tab = "tonight" | "chat" | "memory" | "profile";
 type ComfortMode = "listen" | "untangle" | "cheer";
+type CharacterId = "pei" | "chi" | "yan" | "lu";
 type Message = {
   id: number;
-  role: "pei" | "user" | "system";
+  role: "companion" | "user" | "system";
   text: string;
   time: string;
 };
@@ -15,63 +23,260 @@ type Memory = {
   text: string;
   date: string;
 };
-
-const INITIAL_MEMORIES: Memory[] = [
-  { id: 1, text: "你喜欢雨声，但不喜欢突然的雷声。", date: "今晚" },
-  { id: 2, text: "睡不着时，比起建议，你更想先被好好听完。", date: "今晚" },
-  { id: 3, text: "你希望我叫你“小朋友”。", date: "初次见面" },
-];
-
-const INITIAL_MESSAGES: Message[] = [
-  {
-    id: 1,
-    role: "pei",
-    text: "晚上好，小朋友。今天不用表现得很好，回来就够了。",
-    time: "22:18",
-  },
-  {
-    id: 2,
-    role: "system",
-    text: "裴叙白是虚拟角色，所有回应由人工智能生成，并非真人或心理治疗服务。",
-    time: "",
-  },
-];
+type CharacterProfile = {
+  id: CharacterId;
+  name: string;
+  age: number;
+  archetype: string;
+  role: string;
+  image: string;
+  accent: string;
+  accentSoft: string;
+  heroTitle: string;
+  heroSubline: string;
+  greeting: string;
+  voiceStyle: string;
+  voicePreview: string;
+  voice: { rate: number; pitch: number; index: number };
+  sleepScene: string;
+  sleepLines: string[];
+  modeReplies: Record<ComfortMode, string>;
+  workReply: string;
+  upsetReply: string;
+  cheerReply: string;
+  defaultReplies: Record<ComfortMode, string>;
+  profileQuote: string;
+};
 
 const MODE_COPY: Record<
   ComfortMode,
-  { label: string; short: string; prompt: string; reply: string }
+  { label: string; short: string; prompt: string }
 > = {
   listen: {
     label: "抱抱我",
     short: "先听我说",
     prompt: "今晚我不想解决问题，只想有人听。",
-    reply:
-      "好。你慢慢说，我不急着替你下结论。今天最让你觉得委屈的，是哪一个瞬间？",
   },
   untangle: {
     label: "陪我理清",
     short: "一起想办法",
     prompt: "我脑子有点乱，陪我把事情理清吧。",
-    reply:
-      "我们一次只看一件事。先告诉我：现在最担心的是什么，明天最先需要处理的又是什么？",
   },
   cheer: {
     label: "逗我开心",
     short: "换换心情",
     prompt: "今天太累了，想让你哄我开心。",
-    reply:
-      "批准。今晚你负责把眉头松开，我负责把糟糕的一天从你手里接走。先选：冷笑话，还是三十秒夸夸？",
   },
 };
 
-const SLEEP_LINES = [
-  "把今天最放不下的事，先留在这里。",
-  "不用现在解决。床很稳，房间也很安静。",
-  "慢慢放松眉心，再放松肩膀。",
-  "呼吸不需要很标准，只要比刚才更轻一点。",
-  "今晚已经够辛苦了，剩下的交给明天。",
-  "不用回答。我会把灯关掉。",
+const CHARACTERS: Record<CharacterId, CharacterProfile> = {
+  pei: {
+    id: "pei",
+    name: "裴叙白",
+    age: 28,
+    archetype: "克制守护",
+    role: "记忆重构师",
+    image: "/pei-xubai.png",
+    accent: "#d8bd82",
+    accentSoft: "rgba(216, 189, 130, 0.16)",
+    heroTitle: "今天不用表现得很好。",
+    heroSubline: "回来就够了。",
+    greeting: "晚上好，小朋友。今天不用表现得很好，回来就够了。",
+    voiceStyle: "低沉克制 · 慢语速 · 安定感",
+    voicePreview: "过来。今晚不用解释，我先陪你安静一会儿。",
+    voice: { rate: 0.78, pitch: 0.76, index: 0 },
+    sleepScene: "雨夜档案馆",
+    sleepLines: [
+      "把今天最放不下的事，先留在这里。",
+      "不用现在解决。床很稳，房间也很安静。",
+      "慢慢放松眉心，再放松肩膀。",
+      "呼吸不需要很标准，只要比刚才更轻一点。",
+      "今晚已经够辛苦了，剩下的交给明天。",
+      "不用回答。我会把灯关掉。",
+    ],
+    modeReplies: {
+      listen:
+        "好。你慢慢说，我不急着替你下结论。今天最让你觉得委屈的，是哪一个瞬间？",
+      untangle:
+        "我们一次只看一件事。先告诉我：现在最担心的是什么，明天最先需要处理的又是什么？",
+      cheer:
+        "批准。今晚你负责把眉头松开，我负责把糟糕的一天从你手里接走。先选：冷笑话，还是三十秒夸夸？",
+    },
+    workReply:
+      "先把事实和感受分开：发生了什么、最让你难受的是什么、明天最小的一步是什么？我们一项项来。",
+    upsetReply:
+      "我听见了。你不用把难过讲得很有道理，我也会认真接住。愿意告诉我，是哪一刻开始觉得撑不住的吗？",
+    cheerReply:
+      "那我先替今天的你颁个奖：明明已经这么累，还是把一天好好走完了。奖品是今晚可以什么都不逞强。",
+    defaultReplies: {
+      listen: "嗯，我在听。你可以再多说一点，不需要把语言整理得很漂亮。",
+      untangle:
+        "我们先不处理全部，只找出现在最影响你的那一件事，好吗？",
+      cheer: "收到。今晚禁止你一个人偷偷皱眉——至少要分我一半。",
+    },
+    profileQuote: "你的每一段记忆，我都会认真保存。",
+  },
+  chi: {
+    id: "chi",
+    name: "迟曜",
+    age: 24,
+    archetype: "热烈年下",
+    role: "城市救援飞行员",
+    image: "/chi-yao.png",
+    accent: "#e8a65b",
+    accentSoft: "rgba(232, 166, 91, 0.17)",
+    heroTitle: "今天辛苦了，换我来接你。",
+    heroSubline: "走，去吹吹晚风。",
+    greeting: "你终于来啦。今天是不是又把自己排在最后？过来，先让我看看。",
+    voiceStyle: "清亮温暖 · 语速稍快 · 笑意明显",
+    voicePreview: "抓紧我。你只管往前走，累了我就带你回家。",
+    voice: { rate: 1.02, pitch: 1.12, index: 1 },
+    sleepScene: "云上夜航",
+    sleepLines: [
+      "今晚的飞行任务，是把你平安送进梦里。",
+      "被子盖好了吗？没盖好也没关系，我再等你一下。",
+      "肩膀放松。今天扛过的事，现在可以先卸下来。",
+      "慢慢呼吸，我陪你飞过最后一片云。",
+      "你已经做得很好了，明天不用提前来到今晚。",
+      "晚安。降落以后，我也不会吵醒你。",
+    ],
+    modeReplies: {
+      listen:
+        "来，我把整晚都空给你。想哭就哭，想骂就骂，我保证不插嘴——除非你需要一个抱抱。",
+      untangle:
+        "好，我们一起拆。你说最乱的那一团，我负责找线头。先从明天必须做的第一件事开始？",
+      cheer:
+        "这题我会。给我三十秒，我能从今天找出至少三个值得夸你的地方，不接受反驳。",
+    },
+    workReply:
+      "谁规定你必须一个人把所有事都扛好？我们先把明天最急的挑出来，剩下的排队，谁也不准插队。",
+    upsetReply:
+      "别躲，我看见你难过了。不是要你马上振作——我是来陪你一起坐一会儿的。",
+    cheerReply:
+      "报告：你今天的可爱额度严重超标。处罚是现在放下眉头，跟我去看三分钟夜景。",
+    defaultReplies: {
+      listen: "我在，真的在。你说到哪里，我就陪到哪里。",
+      untangle: "交给我们两个，总会比你一个人想轻一点。先说最难的。",
+      cheer: "好，启动迟曜专属开心预案。第一步：不许说自己不值得被夸。",
+    },
+    profileQuote: "你不用追上光，我会回头牵你。",
+  },
+  yan: {
+    id: "yan",
+    name: "晏无咎",
+    age: 30,
+    archetype: "危险掌控",
+    role: "禁梦拍卖师",
+    image: "/yan-wujiu.png",
+    accent: "#b36d63",
+    accentSoft: "rgba(179, 109, 99, 0.16)",
+    heroTitle: "别逞强。你藏得没那么好。",
+    heroSubline: "今晚，不必对我隐藏。",
+    greeting: "来了？你的沉默比平时重。坐近一点，我不喜欢隔着距离猜答案。",
+    voiceStyle: "低哑从容 · 停顿较长 · 轻微戏谑",
+    voicePreview: "你可以拒绝所有人，包括我。但今晚，别拒绝被好好照顾。",
+    voice: { rate: 0.72, pitch: 0.65, index: 2 },
+    sleepScene: "午夜观景车厢",
+    sleepLines: [
+      "门已经关好。今夜没有人可以打扰你。",
+      "先把那些无关紧要的声音留在车窗外。",
+      "放松手指。你不需要继续抓住今天。",
+      "列车会一直向前，你只管慢慢睡。",
+      "明天的麻烦，自有明天的你处理。",
+      "很好。闭上眼，我替你守到下一站。",
+    ],
+    modeReplies: {
+      listen:
+        "说吧。我不会用廉价的安慰打断你。你真正介意的，恐怕不是事情本身，对吗？",
+      untangle:
+        "把局面交给我看一眼。先去掉别人的期待，再告诉我：你自己究竟想要什么。",
+      cheer:
+        "想笑？可以。但我的笑话收费很贵——报酬是你今晚不再偷偷责怪自己。",
+    },
+    workReply:
+      "他们的要求与你的价值是两回事。先划清责任，再决定明天值得你花多少力气。",
+    upsetReply:
+      "我知道你在忍。放心，我不会逼你开口；但也别指望我假装没看见。",
+    cheerReply:
+      "你皱眉的时候确实很有气势。可惜，对我没用。现在选：听我夸你，还是被我逗笑？",
+    defaultReplies: {
+      listen: "继续。我在判断的不是你，而是这件事为什么让你如此难受。",
+      untangle: "答案并不乱，只是夹杂了太多不属于你的声音。我们把它们去掉。",
+      cheer: "终于轮到我哄你了。这个机会，我可不会随便浪费。",
+    },
+    profileQuote: "我尊重你的每一次拒绝，也记得你的每一次靠近。",
+  },
+  lu: {
+    id: "lu",
+    name: "陆听澜",
+    age: 29,
+    archetype: "温柔疗愈",
+    role: "梦境声音修复师",
+    image: "/lu-tinglan.png",
+    accent: "#8fae9e",
+    accentSoft: "rgba(143, 174, 158, 0.16)",
+    heroTitle: "夜很安静，你可以慢一点。",
+    heroSubline: "我会听见你。",
+    greeting: "欢迎回来。今晚不必急着说话，我们可以先听一会儿雨。",
+    voiceStyle: "温润柔和 · 呼吸感 · 留白较多",
+    voicePreview: "不用急着变好。你愿意停下来听听自己，就已经很勇敢了。",
+    voice: { rate: 0.84, pitch: 0.9, index: 3 },
+    sleepScene: "雨声修复室",
+    sleepLines: [
+      "听见雨了吗？每一声都在替今天慢慢收尾。",
+      "不用调整呼吸，让它自己找到舒服的节奏。",
+      "放松眼睛，再放松一直很努力的肩膀。",
+      "有些答案不必今晚出现，沉默也可以照顾你。",
+      "等你睡着，这场雨会替你把房间守好。",
+      "晚安。醒来以前，不需要完成任何事。",
+    ],
+    modeReplies: {
+      listen:
+        "好。我不会催你，也不会急着把难过变成道理。你想从哪一句开始都可以。",
+      untangle:
+        "我们先把声音调小。什么是事实，什么是担心，什么又是你真正需要的？慢慢分开就好。",
+      cheer:
+        "那我讲一件今天值得开心的小事：你来到这里，说明你还愿意照顾自己的感受。",
+    },
+    workReply:
+      "你已经在高噪声里待了太久。先分清哪些是你的责任，哪些只是别人留给你的回音。",
+    upsetReply:
+      "难过不需要被立刻修好。我可以陪它在这里待一会儿，也陪你。",
+    cheerReply:
+      "好。我不保证让你笑得很大声，但可以先让心里那根绷紧的弦松一点。",
+    defaultReplies: {
+      listen: "我在听。哪怕只说一个词，也足够让我靠近一点。",
+      untangle: "不着急，我们把每件事放回它原来的位置。",
+      cheer: "那就从一个很轻的笑开始。今晚不追求满分开心。",
+    },
+    profileQuote: "沉默不是空白，我会听见你没说出口的部分。",
+  },
+};
+
+const CHARACTER_IDS = Object.keys(CHARACTERS) as CharacterId[];
+
+const INITIAL_MEMORIES: Memory[] = [
+  { id: 1, text: "你喜欢雨声，但不喜欢突然的雷声。", date: "今晚" },
+  { id: 2, text: "睡不着时，比起建议，你更想先被好好听完。", date: "今晚" },
+  { id: 3, text: "你希望被温柔地提醒，而不是被催促。", date: "初次见面" },
 ];
+
+function initialMessages(profile: CharacterProfile): Message[] {
+  return [
+    {
+      id: Number(`${CHARACTER_IDS.indexOf(profile.id) + 1}01`),
+      role: "companion",
+      text: profile.greeting,
+      time: "22:18",
+    },
+    {
+      id: Number(`${CHARACTER_IDS.indexOf(profile.id) + 1}02`),
+      role: "system",
+      text: `${profile.name}是虚拟角色，所有回应由人工智能生成，并非真人或心理治疗服务。`,
+      time: "",
+    },
+  ];
+}
 
 function nowTime() {
   return new Intl.DateTimeFormat("zh-CN", {
@@ -84,7 +289,15 @@ function nowTime() {
 export default function Home() {
   const [tab, setTab] = useState<Tab>("tonight");
   const [mode, setMode] = useState<ComfortMode>("listen");
-  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
+  const [selectedId, setSelectedId] = useState<CharacterId>("pei");
+  const [messagesByCharacter, setMessagesByCharacter] = useState<
+    Record<CharacterId, Message[]>
+  >({
+    pei: initialMessages(CHARACTERS.pei),
+    chi: initialMessages(CHARACTERS.chi),
+    yan: initialMessages(CHARACTERS.yan),
+    lu: initialMessages(CHARACTERS.lu),
+  });
   const [memories, setMemories] = useState<Memory[]>(INITIAL_MEMORIES);
   const [input, setInput] = useState("");
   const [sleepOpen, setSleepOpen] = useState(false);
@@ -96,14 +309,27 @@ export default function Home() {
   const [showBoundary, setShowBoundary] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
+  const character = CHARACTERS[selectedId];
+  const messages = messagesByCharacter[selectedId];
+  const characterStyle = {
+    "--character-accent": character.accent,
+    "--character-soft": character.accentSoft,
+  } as CSSProperties;
+
   useEffect(() => {
-    const saved = window.localStorage.getItem("night-voyage-memories");
-    if (saved) {
+    const savedMemories = window.localStorage.getItem("night-voyage-memories");
+    const savedCharacter = window.localStorage.getItem(
+      "night-voyage-character",
+    ) as CharacterId | null;
+    if (savedMemories) {
       try {
-        setMemories(JSON.parse(saved));
+        setMemories(JSON.parse(savedMemories));
       } catch {
         window.localStorage.removeItem("night-voyage-memories");
       }
+    }
+    if (savedCharacter && CHARACTER_IDS.includes(savedCharacter)) {
+      setSelectedId(savedCharacter);
     }
   }, []);
 
@@ -113,6 +339,12 @@ export default function Home() {
       JSON.stringify(memories),
     );
   }, [memories]);
+
+  useEffect(() => {
+    window.localStorage.setItem("night-voyage-character", selectedId);
+    setSleepLine(0);
+    setShowBoundary(false);
+  }, [selectedId]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -136,23 +368,17 @@ export default function Home() {
     if (!sleeping) return;
     const lineTimer = window.setInterval(() => {
       setSleepLine((current) =>
-        current < SLEEP_LINES.length - 1 ? current + 1 : current,
+        current < character.sleepLines.length - 1 ? current + 1 : current,
       );
     }, 22000);
     return () => window.clearInterval(lineTimer);
-  }, [sleeping]);
+  }, [character.sleepLines.length, sleeping]);
 
   useEffect(() => {
     if (!sleeping || !voiceOn || typeof window === "undefined") return;
-    window.speechSynthesis.cancel();
-    const phrase = new SpeechSynthesisUtterance(SLEEP_LINES[sleepLine]);
-    phrase.lang = "zh-CN";
-    phrase.rate = 0.72;
-    phrase.pitch = 0.82;
-    phrase.volume = 0.72;
-    window.speechSynthesis.speak(phrase);
+    speak(character.sleepLines[sleepLine], true);
     return () => window.speechSynthesis.cancel();
-  }, [sleepLine, sleeping, voiceOn]);
+  }, [character, sleepLine, sleeping, voiceOn]);
 
   const clock = useMemo(() => {
     const minutes = Math.floor(secondsLeft / 60)
@@ -162,36 +388,62 @@ export default function Home() {
     return `${minutes}:${seconds}`;
   }, [secondsLeft]);
 
-  function speak(text: string) {
+  function speak(text: string, sleepVoice = false) {
     if (!voiceOn || typeof window === "undefined") return;
     window.speechSynthesis.cancel();
     const phrase = new SpeechSynthesisUtterance(text);
+    const chineseVoices = window.speechSynthesis
+      .getVoices()
+      .filter((voice) => /^zh/i.test(voice.lang));
+    if (chineseVoices.length) {
+      phrase.voice =
+        chineseVoices[character.voice.index % chineseVoices.length];
+    }
     phrase.lang = "zh-CN";
-    phrase.rate = 0.86;
-    phrase.pitch = 0.86;
+    phrase.rate = sleepVoice
+      ? Math.max(0.58, character.voice.rate - 0.08)
+      : character.voice.rate;
+    phrase.pitch = character.voice.pitch;
+    phrase.volume = sleepVoice ? 0.7 : 0.86;
     window.speechSynthesis.speak(phrase);
+  }
+
+  function appendMessages(newMessages: Message[]) {
+    setMessagesByCharacter((current) => ({
+      ...current,
+      [selectedId]: [...current[selectedId], ...newMessages],
+    }));
+  }
+
+  function selectCharacter(nextId: CharacterId) {
+    window.speechSynthesis?.cancel();
+    setSelectedId(nextId);
+    setInput("");
   }
 
   function chooseMode(nextMode: ComfortMode) {
     setMode(nextMode);
     setTab("chat");
     const copy = MODE_COPY[nextMode];
-    const userMessage: Message = {
-      id: Date.now(),
-      role: "user",
-      text: copy.prompt,
-      time: nowTime(),
-    };
-    setMessages((current) => [...current, userMessage]);
-    window.setTimeout(() => {
-      const response: Message = {
-        id: Date.now() + 1,
-        role: "pei",
-        text: copy.reply,
+    appendMessages([
+      {
+        id: Date.now(),
+        role: "user",
+        text: copy.prompt,
         time: nowTime(),
-      };
-      setMessages((current) => [...current, response]);
-      speak(copy.reply);
+      },
+    ]);
+    window.setTimeout(() => {
+      const reply = character.modeReplies[nextMode];
+      appendMessages([
+        {
+          id: Date.now() + 1,
+          role: "companion",
+          text: reply,
+          time: nowTime(),
+        },
+      ]);
+      speak(reply);
     }, 550);
   }
 
@@ -202,42 +454,39 @@ export default function Home() {
       return "我很在意你现在的安全。先不要一个人待着，也不要伤害自己。请立刻联系你信任的人，让对方来到你身边；如果危险就在眼前，请联系当地紧急服务。我是虚拟角色，不能替代现实中的紧急帮助，但我可以陪你把求助这一步做完。";
     }
     if (/(睡不着|失眠|睡觉|晚安)/.test(text)) {
-      return "那今晚不继续想答案了。把声音留给我，你只需要找一个舒服的姿势。要现在进入睡眠陪伴吗？";
+      return `${character.sleepLines[0]} 要现在进入“${character.sleepScene}”吗？`;
     }
     if (/(老板|工作|加班|同事)/.test(text)) {
-      return mode === "untangle"
-        ? "先把事实和感受分开：发生了什么、最让你难受的是什么、明天最小的一步是什么？我们一项项来。"
-        : "你撑着处理完那些事，回到这里才敢说累。辛苦不是你的错。现在先靠一会儿，不急着证明什么。";
+      return character.workReply;
     }
     if (/(难过|委屈|哭|累|烦)/.test(text)) {
-      return mode === "cheer"
-        ? "那我先替今天的你颁个奖：明明已经这么累，还是把一天好好走完了。奖品是今晚可以什么都不逞强。"
-        : "我听见了。你不用把难过讲得很有道理，我也会认真接住。愿意告诉我，是哪一刻开始觉得撑不住的吗？";
+      return mode === "cheer" ? character.cheerReply : character.upsetReply;
     }
-    return mode === "listen"
-      ? "嗯，我在听。你可以再多说一点，不需要把语言整理得很漂亮。"
-      : mode === "untangle"
-        ? "我大概明白了。我们先不处理全部，只找出现在最影响你的那一件事，好吗？"
-        : "收到。今晚禁止你一个人偷偷皱眉——至少要分我一半。";
+    return character.defaultReplies[mode];
   }
 
   function sendMessage(event: FormEvent) {
     event.preventDefault();
     const text = input.trim();
     if (!text) return;
-    const userMessage: Message = {
-      id: Date.now(),
-      role: "user",
-      text,
-      time: nowTime(),
-    };
-    setMessages((current) => [...current, userMessage]);
+    appendMessages([
+      {
+        id: Date.now(),
+        role: "user",
+        text,
+        time: nowTime(),
+      },
+    ]);
     setInput("");
     window.setTimeout(() => {
       const reply = replyFor(text);
-      setMessages((current) => [
-        ...current,
-        { id: Date.now() + 1, role: "pei", text: reply, time: nowTime() },
+      appendMessages([
+        {
+          id: Date.now() + 1,
+          role: "companion",
+          text: reply,
+          time: nowTime(),
+        },
       ]);
       speak(reply);
     }, 650);
@@ -248,7 +497,7 @@ export default function Home() {
     const text = memoryDraft.trim();
     if (!text) return;
     setMemories((current) => [
-      { id: Date.now(), text, date: "刚刚" },
+      { id: Date.now(), text, date: `刚刚 · ${character.name}` },
       ...current,
     ]);
     setMemoryDraft("");
@@ -268,11 +517,14 @@ export default function Home() {
   }
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" style={characterStyle}>
       <div className="ambient ambient-one" />
       <div className="ambient ambient-two" />
 
-      <section className="phone-stage" aria-label="夜航恋人应用原型">
+      <section
+        className={`phone-stage character-${selectedId}`}
+        aria-label="夜航恋人应用原型"
+      >
         <header className="topbar">
           <button
             className="brand"
@@ -287,7 +539,7 @@ export default function Home() {
             </span>
           </button>
           <div className="top-actions">
-            <span className="online-dot">在线</span>
+            <span className="online-dot">四人在线</span>
             <button
               className="icon-button"
               type="button"
@@ -303,29 +555,71 @@ export default function Home() {
         <div className="content">
           {tab === "tonight" && (
             <section className="tonight-view">
-              <div className="hero-card">
+              <div className="hero-card" key={character.id}>
                 <img
-                  src="/pei-xubai.png"
-                  alt="裴叙白站在夜色中的记忆档案馆"
+                  src={character.image}
+                  alt={`${character.name}，${character.role}`}
                   className="hero-image"
                 />
                 <div className="hero-shade" />
                 <div className="hero-status">
-                  <span className="status-pill">今晚在线</span>
-                  <p>星期六 · 22:18</p>
+                  <span className="status-pill">{character.archetype}</span>
+                  <p>{character.age}岁 · 今晚在线</p>
                 </div>
                 <div className="hero-copy">
-                  <p className="eyebrow">今晚，裴叙白在这里</p>
-                  <h1>今天不用表现得很好。</h1>
-                  <p>回来就够了。</p>
+                  <p className="eyebrow">今晚，{character.name}在这里</p>
+                  <h1>{character.heroTitle}</h1>
+                  <p>{character.heroSubline}</p>
                 </div>
               </div>
+
+              <section className="character-selector">
+                <div className="section-heading compact">
+                  <div>
+                    <span>选择今晚的他</span>
+                    <h2>四种心动，四种陪伴</h2>
+                  </div>
+                  <span className="private-tag">随时可换</span>
+                </div>
+                <div className="character-grid">
+                  {CHARACTER_IDS.map((id) => {
+                    const item = CHARACTERS[id];
+                    return (
+                      <button
+                        type="button"
+                        key={id}
+                        className={id === selectedId ? "active" : ""}
+                        onClick={() => selectCharacter(id)}
+                        aria-pressed={id === selectedId}
+                      >
+                        <span className="character-thumb">
+                          <img src={item.image} alt="" />
+                        </span>
+                        <strong>{item.name}</strong>
+                        <small>{item.archetype}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="voice-preview-row">
+                  <div>
+                    <strong>{character.role}</strong>
+                    <small>{character.voiceStyle}</small>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => speak(character.voicePreview)}
+                  >
+                    试听声线
+                  </button>
+                </div>
+              </section>
 
               <section className="checkin">
                 <div className="section-heading">
                   <div>
                     <span>今晚签到</span>
-                    <h2>想让我怎么陪你？</h2>
+                    <h2>想让{character.name}怎么陪你？</h2>
                   </div>
                   <span className="private-tag">仅本机保存</span>
                 </div>
@@ -357,8 +651,8 @@ export default function Home() {
                 </span>
                 <span className="sleep-entry-copy">
                   <small>熄屏也能听</small>
-                  <strong>和裴叙白一起入睡</strong>
-                  <span>12分钟 · 呼吸放松 · 雨夜档案馆</span>
+                  <strong>和{character.name}一起入睡</strong>
+                  <span>12分钟 · 呼吸放松 · {character.sleepScene}</span>
                 </span>
                 <span className="entry-arrow">开始</span>
               </button>
@@ -366,7 +660,7 @@ export default function Home() {
               <section className="memory-preview">
                 <div className="section-heading compact">
                   <div>
-                    <span>他记得的你</span>
+                    <span>他们记得的你</span>
                     <h2>{memories.length} 段生活痕迹</h2>
                   </div>
                   <button type="button" onClick={() => setTab("memory")}>
@@ -382,16 +676,30 @@ export default function Home() {
             <section className="chat-view">
               <div className="chat-person">
                 <div className="avatar-wrap">
-                  <img src="/pei-xubai.png" alt="" />
+                  <img src={character.image} alt="" />
                   <span />
                 </div>
                 <div>
-                  <strong>裴叙白</strong>
-                  <small>{MODE_COPY[mode].label}模式 · 正在陪你</small>
+                  <strong>{character.name}</strong>
+                  <small>
+                    {MODE_COPY[mode].label}模式 · {character.voiceStyle}
+                  </small>
                 </div>
                 <button type="button" onClick={startSleep}>
                   哄睡
                 </button>
+              </div>
+              <div className="chat-character-switch" aria-label="切换陪伴角色">
+                {CHARACTER_IDS.map((id) => (
+                  <button
+                    type="button"
+                    className={id === selectedId ? "active" : ""}
+                    onClick={() => selectCharacter(id)}
+                    key={id}
+                  >
+                    {CHARACTERS[id].name}
+                  </button>
+                ))}
               </div>
               <div className="mode-switch" aria-label="切换陪伴方式">
                 {(Object.keys(MODE_COPY) as ComfortMode[]).map((item) => (
@@ -416,8 +724,8 @@ export default function Home() {
                       className={`message-row ${message.role}`}
                       key={message.id}
                     >
-                      {message.role === "pei" && (
-                        <img src="/pei-xubai.png" alt="" />
+                      {message.role === "companion" && (
+                        <img src={character.image} alt="" />
                       )}
                       <div>
                         <p>{message.text}</p>
@@ -441,13 +749,13 @@ export default function Home() {
               </div>
               <form className="composer" onSubmit={sendMessage}>
                 <label className="sr-only" htmlFor="chat-input">
-                  告诉裴叙白你现在的感受
+                  告诉{character.name}你现在的感受
                 </label>
                 <input
                   id="chat-input"
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
-                  placeholder="想说什么都可以…"
+                  placeholder={`想对${character.name}说什么…`}
                   autoComplete="off"
                 />
                 <button type="submit" disabled={!input.trim()}>
@@ -461,11 +769,13 @@ export default function Home() {
             <section className="memory-view">
               <div className="page-intro">
                 <span>MEMORY ARCHIVE</span>
-                <h1>他记得的你</h1>
+                <h1>他们记得的你</h1>
                 <p>记忆由你决定。随时修改、删除，或者只把一件事留到明天。</p>
               </div>
               <form className="memory-form" onSubmit={addMemory}>
-                <label htmlFor="memory-input">希望裴叙白记住什么？</label>
+                <label htmlFor="memory-input">
+                  希望{character.name}记住什么？
+                </label>
                 <div>
                   <input
                     id="memory-input"
@@ -512,19 +822,34 @@ export default function Home() {
           {tab === "profile" && (
             <section className="profile-view">
               <div className="profile-portrait">
-                <img src="/pei-xubai.png" alt="裴叙白" />
+                <img src={character.image} alt={character.name} />
               </div>
-              <span className="status-pill">虚拟角色 · 今晚在线</span>
-              <h1>裴叙白</h1>
-              <p className="profile-role">记忆重构师 · 夜航陪伴者</p>
-              <blockquote>
-                “每一次晚安，都是与你重逢。”
-              </blockquote>
+              <span className="status-pill">
+                {character.archetype} · 虚拟角色
+              </span>
+              <h1>{character.name}</h1>
+              <p className="profile-role">
+                {character.role} · {character.age}岁
+              </p>
+              <blockquote>“{character.profileQuote}”</blockquote>
+              <div className="profile-cast">
+                {CHARACTER_IDS.map((id) => (
+                  <button
+                    type="button"
+                    key={id}
+                    className={id === selectedId ? "active" : ""}
+                    onClick={() => selectCharacter(id)}
+                  >
+                    <img src={CHARACTERS[id].image} alt="" />
+                    <span>{CHARACTERS[id].name}</span>
+                  </button>
+                ))}
+              </div>
               <div className="profile-settings">
                 <label>
                   <span>
                     <strong>语音回应</strong>
-                    <small>使用设备内置中文语音试听</small>
+                    <small>{character.voiceStyle}</small>
                   </span>
                   <input
                     type="checkbox"
@@ -532,6 +857,16 @@ export default function Home() {
                     onChange={(event) => setVoiceOn(event.target.checked)}
                   />
                 </label>
+                <button
+                  type="button"
+                  onClick={() => speak(character.voicePreview)}
+                >
+                  <span>
+                    <strong>试听{character.name}的声线</strong>
+                    <small>使用设备内置中文语音演示</small>
+                  </span>
+                  <b>播放</b>
+                </button>
                 <button type="button" onClick={() => setTab("memory")}>
                   <span>
                     <strong>管理我的记忆</strong>
@@ -543,7 +878,7 @@ export default function Home() {
               <div className="ai-boundary">
                 <strong>关于情感边界</strong>
                 <p>
-                  裴叙白可以倾听、陪伴和帮助你放松，但不能替代真人关系、医疗或心理治疗，也不会要求你只依赖他。
+                  四位角色可以倾听、陪伴和帮助你放松，但不能替代真人关系、医疗或心理治疗，也不会要求你只依赖他们。
                 </p>
               </div>
             </section>
@@ -555,7 +890,7 @@ export default function Home() {
             ["tonight", "月", "今晚"],
             ["chat", "话", "对话"],
             ["memory", "忆", "记忆"],
-            ["profile", "人", "我的"],
+            ["profile", "人", "角色"],
           ].map(([item, glyph, label]) => (
             <button
               type="button"
@@ -571,7 +906,12 @@ export default function Home() {
       </section>
 
       {sleepOpen && (
-        <section className="sleep-overlay" role="dialog" aria-modal="true">
+        <section
+          className={`sleep-overlay sleep-${selectedId}`}
+          role="dialog"
+          aria-modal="true"
+          style={characterStyle}
+        >
           <div className="sleep-stars" />
           <button
             className="sleep-close"
@@ -582,11 +922,13 @@ export default function Home() {
             结束
           </button>
           <div className="sleep-content">
-            <span className="sleep-label">雨夜档案馆</span>
+            <span className="sleep-label">
+              {character.name} · {character.sleepScene}
+            </span>
             <div className={`breathing-orb ${sleeping ? "is-playing" : ""}`}>
               <span>晚安</span>
             </div>
-            <p className="sleep-quote">{SLEEP_LINES[sleepLine]}</p>
+            <p className="sleep-quote">{character.sleepLines[sleepLine]}</p>
             <strong className="sleep-clock">{clock}</strong>
             <small>音频将在结束后自动停止</small>
             <div className="sleep-controls">
@@ -607,7 +949,9 @@ export default function Home() {
               <button
                 type="button"
                 onClick={() =>
-                  setSleepLine((current) => (current + 1) % SLEEP_LINES.length)
+                  setSleepLine(
+                    (current) => (current + 1) % character.sleepLines.length,
+                  )
                 }
               >
                 下一句
@@ -615,7 +959,7 @@ export default function Home() {
             </div>
           </div>
           <p className="sleep-footer">
-            不用回复。把手机扣下也可以，我会按时关掉声音。
+            不用回复。把手机扣下也可以，{character.name}会按时关掉声音。
           </p>
         </section>
       )}
