@@ -26,9 +26,9 @@ type MiniMaxResponse = {
 
 const DEFAULT_VOICES: Record<CharacterId, string> = {
   pei: "Chinese (Mandarin)_Reliable_Executive",
-  chi: "Chinese (Mandarin)_Straightforward_Boy",
-  yan: "badao_shaoye",
-  lu: "Chinese (Mandarin)_Lyrical_Voice",
+  chi: "ttv-voice-2026072523103226-Ps97BrCs",
+  yan: "ttv-voice-2026072523104626-M4ZyY4Z1",
+  lu: "ttv-voice-2026072523111126-Ase2NkMO",
 };
 
 const VOICE_SETTINGS: Record<
@@ -36,9 +36,9 @@ const VOICE_SETTINGS: Record<
   { speed: number; pitch: number; emotion: MiniMaxEmotion }
 > = {
   pei: { speed: 0.92, pitch: -1, emotion: "calm" },
-  chi: { speed: 1.04, pitch: 1, emotion: "happy" },
-  yan: { speed: 0.88, pitch: -2, emotion: "calm" },
-  lu: { speed: 0.9, pitch: 0, emotion: "calm" },
+  chi: { speed: 1.02, pitch: 0, emotion: "calm" },
+  yan: { speed: 0.96, pitch: 1, emotion: "calm" },
+  lu: { speed: 0.94, pitch: 0, emotion: "calm" },
 };
 
 const CHARACTER_IDS = new Set<CharacterId>(["pei", "chi", "yan", "lu"]);
