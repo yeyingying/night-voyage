@@ -102,6 +102,19 @@ test("adds restrained character-led daily check-ins", async () => {
   assert.match(chatRoute, /超过事件合理时长/);
 });
 
+test("keeps every companion available during the core night-voyage window", async () => {
+  const { page, characterClock } = await productSources();
+
+  assert.match(characterClock, /NIGHT_COMPANION_START = m\(22\)/);
+  assert.match(characterClock, /NIGHT_COMPANION_END = m\(2, 30\)/);
+  assert.match(characterClock, /NIGHT_COMPANION_BLOCKS/);
+  assert.match(characterClock, /训练复盘后的夜聊/);
+  assert.match(characterClock, /闭馆后的星空时间/);
+  assert.match(characterClock, /availability: "available"/);
+  assert.match(page, /PROACTIVE_QUIET_START_HOUR = 2/);
+  assert.match(page, /PROACTIVE_QUIET_START_MINUTE = 30/);
+});
+
 test("pilots continuous living personas for Chi Yao and Xie Linyuan", async () => {
   const { page, css, chatRoute, ttsRoute, personaEngine } =
     await productSources();

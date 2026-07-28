@@ -447,7 +447,7 @@ const CHAT_HISTORY_KEY = "night-voyage-chat-history";
 const PROACTIVE_FIRST_MINUTES = [90, 150] as const;
 const PROACTIVE_FOLLOWUP_MINUTES = [240, 360] as const;
 const PROACTIVE_DAILY_LIMIT = 3;
-const PROACTIVE_QUIET_START_HOUR = 23;
+const PROACTIVE_QUIET_START_HOUR = 2;
 const PROACTIVE_QUIET_START_MINUTE = 30;
 const PROACTIVE_QUIET_END_HOUR = 8;
 const PROACTIVE_QUIET_END_MINUTE = 30;
@@ -569,7 +569,9 @@ function isProactiveQuietTime(date = new Date()) {
     PROACTIVE_QUIET_START_HOUR * 60 + PROACTIVE_QUIET_START_MINUTE;
   const quietEnd =
     PROACTIVE_QUIET_END_HOUR * 60 + PROACTIVE_QUIET_END_MINUTE;
-  return minutes >= quietStart || minutes < quietEnd;
+  return quietStart < quietEnd
+    ? minutes >= quietStart && minutes < quietEnd
+    : minutes >= quietStart || minutes < quietEnd;
 }
 
 function nextQuietEnd(from: number) {

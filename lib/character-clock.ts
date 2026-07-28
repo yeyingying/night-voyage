@@ -44,6 +44,87 @@ export type CharacterWorldSnapshot = {
 
 const m = (hour: number, minute = 0) => hour * 60 + minute;
 
+const NIGHT_COMPANION_START = m(22);
+const NIGHT_COMPANION_END = m(2, 30);
+
+const NIGHT_COMPANION_BLOCKS: Record<
+  CharacterClockId,
+  Omit<ScheduleBlock, "start" | "end">
+> = {
+  pei: {
+    activity: "夜间阅读和私人时间",
+    scene: "家里",
+    availability: "available",
+    checkIns: [
+      "书看到一半，忽然想起你今天还没来讲讲发生了什么。",
+      "今晚留了一段不被工作打扰的时间。你想说话，我就在。",
+    ],
+  },
+  chi: {
+    activity: "训练复盘后的夜聊",
+    scene: "宿舍",
+    availability: "available",
+    checkIns: [
+      "训练复盘终于结束了。今晚剩下这点时间，我先留给你。",
+      "游戏还没开，我来看看某个人是不是又打算偷偷熬夜。",
+    ],
+  },
+  yan: {
+    activity: "夜场收尾后的私人时间",
+    scene: "书房或回程车上",
+    availability: "available",
+    checkIns: [
+      "拍卖厅安静下来了。现在没有旁人，你可以慢慢说。",
+      "今天该应付的人都应付完了。剩下的耐心，正好留给你。",
+    ],
+  },
+  lu: {
+    activity: "听完音轨后的安静时间",
+    scene: "声音修复室或家里",
+    availability: "available",
+    checkIns: [
+      "最后一段音轨已经停了。现在这间屋子里，我只想听你的声音。",
+      "耳机摘下来了。你想聊什么，都不用先整理好再来。",
+    ],
+  },
+  cheng: {
+    activity: "深夜营业的安静空档",
+    scene: "深夜书店",
+    availability: "available",
+    checkIns: [
+      "店里安静下来了，靠窗那盏灯还亮着。给你留的。",
+      "刚把书合上。你要是现在来，我就不急着闭店。",
+    ],
+  },
+  qi: {
+    activity: "夜间待命空档",
+    scene: "救援中心",
+    availability: "available",
+    checkIns: [
+      "这一轮检查结束了，目前没有任务。你的事可以慢慢说。",
+      "设备都正常，我也在。今晚如果不太好过，先来找我。",
+    ],
+  },
+  shen: {
+    activity: "夜间记录和放松",
+    scene: "睡眠实验室或家里",
+    availability: "available",
+    checkIns: [
+      "今天的数据已经停在这里了。接下来这段时间，不研究别人，只听你。",
+      "按计划现在应该放松。你来得正好，可以一起执行。",
+    ],
+  },
+  xu: {
+    activity: "闭馆后的星空时间",
+    scene: "星象馆穹顶",
+    availability: "available",
+    checkIns: [
+      "最后一场散了，穹顶还没完全熄灯。想不想陪我坐一会儿？",
+      "馆里只剩一片安静的星空。我给你留了最好的位置。",
+    ],
+  },
+};
+
 const CHARACTER_SCHEDULES: Record<CharacterClockId, CharacterSchedule> = {
   pei: {
     weekday: [
@@ -220,10 +301,60 @@ function scheduleFor(characterId: CharacterClockId, date: Date) {
     : CHARACTER_SCHEDULES[characterId].weekday;
 }
 
+function getNightCompanionSnapshot(
+  characterId: CharacterClockId,
+  date: Date,
+): CharacterWorldSnapshot | null {
+  const minuteOfDay = date.getHours() * 60 + date.getMinutes();
+  const isNightWindow =
+    minuteOfDay >= NIGHT_COMPANION_START ||
+    minuteOfDay < NIGHT_COMPANION_END;
+
+  if (!isNightWindow) return null;
+
+  const block = NIGHT_COMPANION_BLOCKS[characterId];
+  const startedAt = new Date(date);
+  const endsAt = new Date(date);
+
+  if (minuteOfDay < NIGHT_COMPANION_END) {
+    startedAt.setDate(startedAt.getDate() - 1);
+  } else {
+    endsAt.setDate(endsAt.getDate() + 1);
+  }
+
+  startedAt.setHours(22, 0, 0, 0);
+  endsAt.setHours(2, 30, 0, 0);
+
+  const nextSchedule = scheduleFor(characterId, endsAt);
+  const nextBlock =
+    nextSchedule.find(
+      (item) =>
+        NIGHT_COMPANION_END >= item.start &&
+        NIGHT_COMPANION_END < item.end,
+    ) ?? nextSchedule[0];
+
+  return {
+    activity: block.activity,
+    scene: block.scene,
+    availability: block.availability,
+    statusText: block.activity,
+    startedAt: startedAt.getTime(),
+    endsAt: endsAt.getTime(),
+    startLabel: minuteLabel(NIGHT_COMPANION_START),
+    endLabel: minuteLabel(NIGHT_COMPANION_END),
+    nextActivity: nextBlock.activity,
+    nextStartsAt: endsAt.getTime(),
+    checkIns: block.checkIns,
+  };
+}
+
 export function getCharacterWorldSnapshot(
   characterId: CharacterClockId,
   date = new Date(),
 ): CharacterWorldSnapshot {
+  const nightCompanionSnapshot = getNightCompanionSnapshot(characterId, date);
+  if (nightCompanionSnapshot) return nightCompanionSnapshot;
+
   const schedule = scheduleFor(characterId, date);
   const minuteOfDay = date.getHours() * 60 + date.getMinutes();
   const blockIndex = Math.max(
