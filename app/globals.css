@@ -1386,6 +1386,50 @@ input:focus-visible {
   line-height: 1.8;
 }
 
+.persona-pulse {
+  margin: -6px 0 18px;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--character-soft);
+  text-align: left;
+}
+
+.persona-pulse > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-subtle);
+  font-size: 9px;
+}
+
+.persona-pulse b {
+  color: var(--character-accent);
+  font-weight: 560;
+}
+
+.persona-pulse strong {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.persona-pulse p {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.7;
+}
+
+.persona-pulse small {
+  display: block;
+  margin-top: 10px;
+  color: var(--character-accent);
+  font-size: 9px;
+}
+
 .profile-settings {
   overflow: hidden;
   border: 1px solid var(--line);

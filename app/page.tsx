@@ -16,6 +16,20 @@ import {
 } from "@/lib/character-clock";
 import { DEVELOPER_VOICE_STORAGE_KEY } from "@/lib/voice-config";
 import { recordTtsUsage } from "@/lib/tts-usage";
+import {
+  createPersonaState,
+  derivePersonaVoiceMood,
+  getPersonaSnapshot,
+  isPilotCharacter,
+  PERSONA_STATE_STORAGE_KEY,
+  PILOT_CHARACTER_IDS,
+  recordPersonaInteraction,
+  validPersonaState,
+  VOICE_PERFORMANCES,
+  type PersonaState,
+  type PersonaVoiceMood,
+  type PilotCharacterId,
+} from "@/lib/persona-engine";
 
 type Tab = "tonight" | "chat" | "memory" | "profile";
 type CharacterId =
@@ -120,6 +134,10 @@ type PendingVoiceMessage = {
   duration: number;
 };
 
+type PersonaStateByCharacter = Partial<
+  Record<PilotCharacterId, PersonaState>
+>;
+
 const CHARACTERS: Record<CharacterId, CharacterProfile> = {
   pei: {
     id: "pei",
@@ -128,7 +146,7 @@ const CHARACTERS: Record<CharacterId, CharacterProfile> = {
     archetype: "成熟守护系",
     role: "记忆重构师",
     image: "/pei-xubai.png",
-    realImage: "/real-pei-xubai-v2.jpg",
+    realImage: "/real-pei-xubai-v3.jpg",
     accent: "#d8bd82",
     accentSoft: "rgba(216, 189, 130, 0.16)",
     heroTitle: "累了就先歇会儿。",
@@ -640,6 +658,8 @@ export default function Home() {
   const [proactiveEnabled, setProactiveEnabled] = useState(true);
   const [localStateHydrated, setLocalStateHydrated] = useState(false);
   const [clockNow, setClockNow] = useState(0);
+  const [personaStates, setPersonaStates] =
+    useState<PersonaStateByCharacter>({});
   const [pendingImage, setPendingImage] = useState<{
     url: string;
     name: string;
@@ -681,18 +701,37 @@ export default function Home() {
     sentToday: 0,
     lastMessageIndex: -1,
   });
+  const personaStateRef = useRef<PersonaStateByCharacter>({});
 
   const character = CHARACTERS[selectedId];
+  const stableRenderNow = useMemo(
+    () =>
+      clockNow
+        ? new Date(clockNow)
+        : new Date(2026, 0, 5, 12, 0, 0),
+    [clockNow],
+  );
   const worldSnapshot = useMemo(
     () =>
       getCharacterWorldSnapshot(
         selectedId,
-        new Date(clockNow || 0),
+        stableRenderNow,
       ),
-    [clockNow, selectedId],
+    [selectedId, stableRenderNow],
   );
   const characterImage =
     visualStyle === "real" ? character.realImage : character.image;
+  const personaSnapshot = useMemo(
+    () =>
+      getPersonaSnapshot(
+        selectedId,
+        isPilotCharacter(selectedId)
+          ? personaStates[selectedId]
+          : undefined,
+        stableRenderNow.getTime(),
+      ),
+    [personaStates, selectedId, stableRenderNow],
+  );
   const messages = messagesByCharacter[selectedId];
   const sleepProgram = SLEEP_PROGRAMS[sleepMode];
   const sleepLines = useMemo(
@@ -719,6 +758,38 @@ export default function Home() {
       ) as CharacterId | null;
       const savedChatHistory =
         window.localStorage.getItem(CHAT_HISTORY_KEY);
+      const savedPersonaStates = window.localStorage.getItem(
+        PERSONA_STATE_STORAGE_KEY,
+      );
+      const personaNow = Date.now();
+      let restoredPersonaStates: PersonaStateByCharacter = {};
+      if (savedPersonaStates) {
+        try {
+          const parsed = JSON.parse(savedPersonaStates) as Record<
+            string,
+            unknown
+          >;
+          restoredPersonaStates = Object.fromEntries(
+            PILOT_CHARACTER_IDS.map((id) => [
+              id,
+              validPersonaState(parsed[id], personaNow) ??
+                createPersonaState(personaNow),
+            ]),
+          ) as PersonaStateByCharacter;
+        } catch {
+          window.localStorage.removeItem(PERSONA_STATE_STORAGE_KEY);
+        }
+      }
+      if (!Object.keys(restoredPersonaStates).length) {
+        restoredPersonaStates = Object.fromEntries(
+          PILOT_CHARACTER_IDS.map((id) => [
+            id,
+            createPersonaState(personaNow),
+          ]),
+        ) as PersonaStateByCharacter;
+      }
+      personaStateRef.current = restoredPersonaStates;
+      setPersonaStates(restoredPersonaStates);
       setAdultConfirmed(
         window.localStorage.getItem(ADULT_CONFIRMATION_KEY) === "yes",
       );
@@ -862,6 +933,14 @@ export default function Home() {
   }, [localStateHydrated, messagesByCharacter]);
 
   useEffect(() => {
+    if (!localStateHydrated) return;
+    window.localStorage.setItem(
+      PERSONA_STATE_STORAGE_KEY,
+      JSON.stringify(personaStates),
+    );
+  }, [localStateHydrated, personaStates]);
+
+  useEffect(() => {
     window.localStorage.setItem("night-voyage-character", selectedId);
   }, [selectedId]);
 
@@ -950,7 +1029,16 @@ export default function Home() {
         });
         return;
       }
-      const moments = liveSnapshot.checkIns;
+      const livePersona = getPersonaSnapshot(
+        current.characterId,
+        isPilotCharacter(current.characterId)
+          ? personaStateRef.current[current.characterId]
+          : undefined,
+        now,
+      );
+      const moments = livePersona
+        ? [...livePersona.proactiveLines, ...liveSnapshot.checkIns]
+        : liveSnapshot.checkIns;
       if (!moments.length) return;
       const offset =
         moments.length > 1
@@ -1100,7 +1188,11 @@ export default function Home() {
     setVoiceLoading(false);
   }
 
-  function fallbackSpeak(text: string, sleepVoice = false) {
+  function fallbackSpeak(
+    text: string,
+    sleepVoice = false,
+    voiceMood: PersonaVoiceMood = "composed",
+  ) {
     window.speechSynthesis.cancel();
     const phrase = new SpeechSynthesisUtterance(text);
     const chineseVoices = window.speechSynthesis
@@ -1111,21 +1203,44 @@ export default function Home() {
         chineseVoices[character.voice.index % chineseVoices.length];
     }
     phrase.lang = "zh-CN";
+    const performance =
+      !sleepVoice && isPilotCharacter(character.id)
+        ? VOICE_PERFORMANCES[character.id][voiceMood]
+        : null;
     phrase.rate = sleepVoice
       ? Math.max(0.58, character.voice.rate - 0.08)
-      : character.voice.rate;
-    phrase.pitch = character.voice.pitch;
-    phrase.volume = sleepVoice ? 0.7 : 0.86;
+      : Math.min(
+          1.2,
+          Math.max(
+            0.75,
+            character.voice.rate + (performance?.speedDelta ?? 0),
+          ),
+        );
+    phrase.pitch = Math.min(
+      1.25,
+      Math.max(
+        0.7,
+        character.voice.pitch + (performance?.pitchDelta ?? 0) * 0.04,
+      ),
+    );
+    phrase.volume = sleepVoice
+      ? 0.7
+      : Math.min(1, performance?.volume ?? 0.86);
     window.speechSynthesis.speak(phrase);
   }
 
-  async function playNaturalVoice(text: string, sleepVoice = false) {
+  async function playNaturalVoice(
+    text: string,
+    sleepVoice = false,
+    voiceMood: PersonaVoiceMood = "composed",
+  ) {
     stopVoice();
     const voiceId = developerVoiceIds[character.id];
     const cacheKey = [
       character.id,
       voiceId || "default",
       sleepVoice ? "sleep" : "chat",
+      voiceMood,
       text,
     ].join("|");
     const requestController = new AbortController();
@@ -1143,6 +1258,7 @@ export default function Home() {
             characterId: character.id,
             scene: sleepVoice ? "sleep" : "chat",
             voiceId,
+            voiceMood,
           }),
           signal: requestController.signal,
         });
@@ -1183,7 +1299,7 @@ export default function Home() {
       console.warn("Natural voice unavailable; using device voice.", error);
       releaseAudio();
       setVoiceProvider("device");
-      fallbackSpeak(text, sleepVoice);
+      fallbackSpeak(text, sleepVoice, voiceMood);
     } finally {
       if (voiceRequestRef.current === requestController) {
         voiceRequestRef.current = null;
@@ -1192,9 +1308,13 @@ export default function Home() {
     }
   }
 
-  function speak(text: string, sleepVoice = false) {
+  function speak(
+    text: string,
+    sleepVoice = false,
+    voiceMood: PersonaVoiceMood = "composed",
+  ) {
     if (!voiceOn || typeof window === "undefined") return;
-    void playNaturalVoice(text, sleepVoice);
+    void playNaturalVoice(text, sleepVoice, voiceMood);
   }
 
   function setVoiceEnabled(enabled: boolean) {
@@ -1284,6 +1404,11 @@ export default function Home() {
       },
     ]);
     markPlayerActivity(pending.profileId);
+    const personaState = recordPersonaTurn(
+      pending.profileId,
+      transcript,
+      Date.now(),
+    );
     setVoiceCaptureState("idle");
     setVoiceCaptureNotice("");
     setVoiceTapMode(false);
@@ -1291,6 +1416,8 @@ export default function Home() {
       pending.profileId,
       transcript,
       pending.history,
+      false,
+      personaState,
     );
   }
 
@@ -1547,6 +1674,26 @@ export default function Home() {
     });
   }
 
+  function recordPersonaTurn(
+    characterId: CharacterId,
+    text: string,
+    now = Date.now(),
+  ) {
+    if (!isPilotCharacter(characterId)) return undefined;
+    const nextState = recordPersonaInteraction(
+      personaStateRef.current[characterId],
+      text,
+      now,
+    );
+    const nextStates = {
+      ...personaStateRef.current,
+      [characterId]: nextState,
+    };
+    personaStateRef.current = nextStates;
+    setPersonaStates(nextStates);
+    return nextState;
+  }
+
   function updateProactiveEnabled(enabled: boolean) {
     window.localStorage.setItem(PROACTIVE_ENABLED_KEY, enabled ? "yes" : "no");
     setProactiveEnabled(enabled);
@@ -1711,8 +1858,24 @@ export default function Home() {
     text: string,
     conversation: Message[],
     imageAttached = false,
+    personaStateOverride?: PersonaState,
   ) {
     const profile = CHARACTERS[profileId];
+    const requestPersonaState =
+      personaStateOverride ??
+      (isPilotCharacter(profileId)
+        ? personaStateRef.current[profileId]
+        : undefined);
+    const requestPersonaSnapshot = getPersonaSnapshot(
+      profileId,
+      requestPersonaState,
+      Date.now(),
+    );
+    let voiceMood = derivePersonaVoiceMood(
+      profileId,
+      text,
+      requestPersonaSnapshot,
+    );
     const highRisk =
       /(不想活|想死|死了算了|自杀|轻生|自残|结束生命|活不下去|活着没意思|不想醒来)/.test(
         text,
@@ -1732,7 +1895,7 @@ export default function Home() {
           sentAt: Date.now(),
         },
       ]);
-      speak(reply);
+      speak(reply, false, "concerned");
       return;
     }
 
@@ -1755,6 +1918,7 @@ export default function Home() {
           imageAttached,
           adultConfirmed,
           intimacyEnabled,
+          personaState: requestPersonaState,
           worldContext: {
             now: requestNow,
             localDateTime: new Intl.DateTimeFormat("zh-CN", {
@@ -1795,11 +1959,28 @@ export default function Home() {
       if (!response.ok) {
         throw new Error(`Chat request failed with ${response.status}`);
       }
-      const result = (await response.json()) as { reply?: string };
+      const result = (await response.json()) as {
+        reply?: string;
+        voiceMood?: PersonaVoiceMood;
+      };
       if (!result.reply?.trim()) {
         throw new Error("Chat response was empty");
       }
       reply = result.reply.trim();
+      if (
+        result.voiceMood &&
+        [
+          "composed",
+          "bright",
+          "flustered",
+          "concerned",
+          "irritated",
+          "guarded",
+          "soft",
+        ].includes(result.voiceMood)
+      ) {
+        voiceMood = result.voiceMood;
+      }
     } catch (error) {
       if (
         requestController.signal.aborted ||
@@ -1826,7 +2007,7 @@ export default function Home() {
         sentAt: Date.now(),
       },
     ]);
-    speak(reply);
+    speak(reply, false, voiceMood);
   }
 
   function sendMessage(event: FormEvent) {
@@ -1854,11 +2035,22 @@ export default function Home() {
       },
     ]);
     markPlayerActivity(profileId);
+    const personaState = recordPersonaTurn(
+      profileId,
+      text,
+      Date.now(),
+    );
     setInput("");
     setPendingImage(null);
     setImageNotice("");
     if (photoInputRef.current) photoInputRef.current.value = "";
-    void respondToMessage(profileId, text, history, Boolean(attachedImage));
+    void respondToMessage(
+      profileId,
+      text,
+      history,
+      Boolean(attachedImage),
+      personaState,
+    );
   }
 
   function addMemory(event: FormEvent) {
@@ -2391,6 +2583,19 @@ export default function Home() {
                   {character.role} · {character.age}岁
                 </p>
                 <blockquote>“{character.profileQuote}”</blockquote>
+                {personaSnapshot && (
+                  <aside className="persona-pulse">
+                    <div>
+                      <span>他正在经历</span>
+                      <b>{personaSnapshot.eventPhase}</b>
+                    </div>
+                    <strong>{personaSnapshot.eventTitle}</strong>
+                    <p>{personaSnapshot.eventFact}</p>
+                    <small>
+                      你们之间 · {personaSnapshot.relationshipStage}
+                    </small>
+                  </aside>
+                )}
               </div>
               <div className="profile-details">
                 <div className="profile-cast">

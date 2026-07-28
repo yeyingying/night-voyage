@@ -6,6 +6,12 @@ import {
   VOICE_SETTINGS,
   type CharacterId,
 } from "@/lib/voice-config";
+import {
+  applyVoiceBreak,
+  isPilotCharacter,
+  VOICE_PERFORMANCES,
+  type PersonaVoiceMood,
+} from "@/lib/persona-engine";
 
 type VoiceScene = "chat" | "sleep";
 
@@ -42,6 +48,15 @@ type MiniMaxResponse = {
 
 const SCENES = new Set<VoiceScene>(["chat", "sleep"]);
 const SPEECH_MODELS = new Set(["speech-2.8-turbo", "speech-2.8-hd"]);
+const VOICE_MOODS = new Set<PersonaVoiceMood>([
+  "composed",
+  "bright",
+  "flustered",
+  "concerned",
+  "irritated",
+  "guarded",
+  "soft",
+]);
 
 function runtimeEnv(): RuntimeEnv {
   return {
@@ -91,6 +106,7 @@ export async function POST(request: Request) {
     scene?: unknown;
     voiceId?: unknown;
     model?: unknown;
+    voiceMood?: unknown;
   };
 
   try {
@@ -112,6 +128,11 @@ export async function POST(request: Request) {
     typeof payload.model === "string" && SPEECH_MODELS.has(payload.model)
       ? payload.model
       : undefined;
+  const voiceMood =
+    typeof payload.voiceMood === "string" &&
+    VOICE_MOODS.has(payload.voiceMood as PersonaVoiceMood)
+      ? (payload.voiceMood as PersonaVoiceMood)
+      : "composed";
 
   if (!text || text.length > 800) {
     return Response.json(
@@ -136,13 +157,22 @@ export async function POST(request: Request) {
   }
 
   const voice = VOICE_SETTINGS[characterId];
+  const performance =
+    scene === "chat" && isPilotCharacter(characterId)
+      ? VOICE_PERFORMANCES[characterId][voiceMood]
+      : null;
   const configuredModel = runtime.MINIMAX_SPEECH_MODEL?.trim();
   const model =
     requestedModel ||
     (configuredModel && SPEECH_MODELS.has(configuredModel)
       ? configuredModel
       : "speech-2.8-turbo");
-  const preparedText = scene === "sleep" ? sleepPacing(text) : text;
+  const preparedText =
+    scene === "sleep"
+      ? sleepPacing(text)
+      : performance
+        ? applyVoiceBreak(text, characterId, voiceMood)
+        : text;
   const selectedVoiceId = customVoiceId(
     characterId,
     runtime,
@@ -168,10 +198,16 @@ export async function POST(request: Request) {
         output_format: "hex",
         voice_setting: {
           voice_id: selectedVoiceId,
-          speed: scene === "sleep" ? voice.sleepSpeed : voice.speed,
-          vol: scene === "sleep" ? 0.86 : 1,
-          pitch: voice.pitch,
-          emotion: voice.emotion,
+          speed:
+            scene === "sleep"
+              ? voice.sleepSpeed
+              : Math.min(
+                  1.2,
+                  Math.max(0.75, voice.speed + (performance?.speedDelta ?? 0)),
+                ),
+          vol: scene === "sleep" ? 0.86 : (performance?.volume ?? 1),
+          pitch: voice.pitch + (performance?.pitchDelta ?? 0),
+          emotion: performance?.emotion ?? voice.emotion,
         },
         audio_setting: {
           sample_rate: 32000,

@@ -3,14 +3,32 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 async function productSources() {
-  const [page, layout, css, chatRoute, characterClock] = await Promise.all([
+  const [
+    page,
+    layout,
+    css,
+    chatRoute,
+    ttsRoute,
+    characterClock,
+    personaEngine,
+  ] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/api/chat/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/tts/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/character-clock.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/persona-engine.ts", import.meta.url), "utf8"),
   ]);
-  return { page, layout, css, chatRoute, characterClock };
+  return {
+    page,
+    layout,
+    css,
+    chatRoute,
+    ttsRoute,
+    characterClock,
+    personaEngine,
+  };
 }
 
 test("ships the finished game shell and both visual styles", async () => {
@@ -67,4 +85,31 @@ test("adds restrained character-led daily check-ins", async () => {
   assert.match(chatRoute, /worldTimelinePrompt/);
   assert.match(chatRoute, /旧事件推进到现在/);
   assert.match(chatRoute, /超过事件合理时长/);
+});
+
+test("pilots continuous living personas for Chi Yao and Xie Linyuan", async () => {
+  const { page, css, chatRoute, ttsRoute, personaEngine } =
+    await productSources();
+
+  assert.match(personaEngine, /PILOT_CHARACTER_IDS.*\["chi", "yan"\]/);
+  assert.match(personaEngine, /高难度模拟机考核/);
+  assert.match(personaEngine, /争议拍品复核/);
+  assert.match(personaEngine, /socialTies/);
+  assert.match(personaEngine, /RELATIONSHIP_STAGES/);
+  assert.match(personaEngine, /DAILY_BOND_CAP = 5/);
+  assert.match(personaEngine, /recordPersonaInteraction/);
+  assert.match(personaEngine, /derivePersonaVoiceMood/);
+  assert.match(personaEngine, /VOICE_PERFORMANCES/);
+  assert.match(personaEngine, /生活事件必须随真实时间推进/);
+
+  assert.match(page, /PERSONA_STATE_STORAGE_KEY/);
+  assert.match(page, /recordPersonaTurn/);
+  assert.match(page, /personaState: requestPersonaState/);
+  assert.match(page, /persona-pulse/);
+  assert.match(css, /\.persona-pulse/);
+
+  assert.match(chatRoute, /personaSystemPrompt/);
+  assert.match(chatRoute, /voiceMood/);
+  assert.match(ttsRoute, /applyVoiceBreak/);
+  assert.match(ttsRoute, /performance\?\.speedDelta/);
 });

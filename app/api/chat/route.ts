@@ -1,4 +1,10 @@
 import { env } from "cloudflare:workers";
+import {
+  derivePersonaVoiceMood,
+  getPersonaSnapshot,
+  personaSystemPrompt,
+  validPersonaState,
+} from "@/lib/persona-engine";
 
 type CharacterId =
   | "pei"
@@ -380,6 +386,7 @@ export async function POST(request: Request) {
     adultConfirmed?: unknown;
     intimacyEnabled?: unknown;
     worldContext?: unknown;
+    personaState?: unknown;
   };
 
   try {
@@ -424,6 +431,24 @@ export async function POST(request: Request) {
   const history = validHistory(payload.history);
   const worldContext = validWorldContext(payload.worldContext);
   const timelinePrompt = worldTimelinePrompt(worldContext, history);
+  const personaState = validPersonaState(
+    payload.personaState,
+    worldContext?.now ?? Date.now(),
+  );
+  const personaSnapshot = getPersonaSnapshot(
+    characterId,
+    personaState,
+    worldContext?.now ?? Date.now(),
+  );
+  const personaPrompt = personaSystemPrompt(
+    personaSnapshot,
+    worldContext?.now ?? Date.now(),
+  );
+  const voiceMood = derivePersonaVoiceMood(
+    characterId,
+    message,
+    personaSnapshot,
+  );
   const memories = validMemories(payload.memories);
   const memoryPrompt = memories.length
     ? `玩家允许保存的记忆：\n${memories.map((item) => `- ${item}`).join("\n")}`
@@ -451,6 +476,7 @@ export async function POST(request: Request) {
     ADAPTIVE_PROMPT,
     RELATIONSHIP_PROMPT,
     timelinePrompt,
+    personaPrompt,
     memoryPrompt,
     samplePrompt,
     ADAPTIVE_EXAMPLES,
@@ -556,7 +582,17 @@ export async function POST(request: Request) {
   }
 
   return Response.json(
-    { reply: generated.reply },
+    {
+      reply: generated.reply,
+      voiceMood,
+      persona: personaSnapshot
+        ? {
+            relationshipStage: personaSnapshot.relationshipStage,
+            lifeEvent: personaSnapshot.eventTitle,
+            lifePhase: personaSnapshot.eventPhase,
+          }
+        : null,
+    },
     {
       headers: {
         "Cache-Control": "private, no-store",
