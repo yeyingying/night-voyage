@@ -254,6 +254,27 @@ function replyHasBoundaryIssue(reply: string) {
   );
 }
 
+function replyEvadesDirectQuestion(message: string, reply: string) {
+  const isQuestion =
+    /[？?吗么]/u.test(message) ||
+    /^(谁|什么|为什么|怎么|怎样|哪|几|多少|是不是|有没有|能不能|会不会)/u.test(
+      message,
+    );
+  if (!isQuestion) return false;
+
+  const isRelationshipQuestion =
+    /(喜欢|爱|心动|在意|想我|想你|喜欢的人|有没有人)/u.test(message);
+  if (isRelationshipQuestion) {
+    return !/(有|没有|没|喜欢|不喜欢|爱|心动|在意|想你|想我|算|是你)/u.test(
+      reply,
+    );
+  }
+
+  return /^(你问得|怎么突然|为什么这么问|这个嘛|先说你|那你呢|我可以|你说怎么陪)/u.test(
+    reply,
+  );
+}
+
 function validHistory(value: unknown): HistoryMessage[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -546,23 +567,19 @@ export async function POST(request: Request) {
   let generated: Awaited<ReturnType<typeof generate>>;
   try {
     generated = await generate();
-    if (
-      generated.ok &&
-      (replyNeedsRewrite(generated.reply) ||
-        replyHasBoundaryIssue(generated.reply))
-    ) {
+    for (let rewriteAttempt = 0; rewriteAttempt < 2; rewriteAttempt += 1) {
+      const needsRewrite =
+        generated.ok &&
+        (replyNeedsRewrite(generated.reply) ||
+          replyHasBoundaryIssue(generated.reply) ||
+          replyEvadesDirectQuestion(message, generated.reply));
+      if (!needsRewrite) break;
+
       const rewritten = await generate(
-        `刚才那版太像模板、半句话、盘问，或者边界感不合适。请换一种完全不同的说法，像熟悉她的人在微信里自然接话，约25到80个汉字。贴着她刚说的具体事情回应，不必总结道理。这一次不要提任何问题，不使用问号，也不要让她继续解释；直接给她一句有内容的回应。不要劝她远离现实中的朋友或其他人，不暗示只能依赖你。不要只说“嗯”“好”“那就躺着”，不要连续重复同一个词，不写括号、动作或舞台说明。`,
+        `玩家刚才真正问的是：“${message.slice(0, 180)}”。上一版没有正面回答，必须重写。第一句立刻给出明确答案，不能反问、打趣后跳过、转移话题，也不能用“我陪你”“你说怎么陪就怎么陪”代替答案。回答之后才可以补一句符合角色性格的暧昧、玩笑或解释。像熟悉她的人在微信里自然接话，约25到80个汉字。不要劝她远离现实中的朋友或其他人，不暗示只能依赖你；不写括号、动作或舞台说明。`,
         generated.reply,
       );
-      if (
-        rewritten.ok &&
-        rewritten.reply &&
-        !replyNeedsRewrite(rewritten.reply) &&
-        !replyHasBoundaryIssue(rewritten.reply)
-      ) {
-        generated = rewritten;
-      }
+      generated = rewritten;
     }
   } catch (error) {
     console.error("[chat] MiniMax request failed", error);
@@ -573,7 +590,9 @@ export async function POST(request: Request) {
     !generated.ok ||
     !generated.reply ||
     generated.reply.length < 6 ||
-    replyHasBoundaryIssue(generated.reply)
+    replyNeedsRewrite(generated.reply) ||
+    replyHasBoundaryIssue(generated.reply) ||
+    replyEvadesDirectQuestion(message, generated.reply)
   ) {
     console.error("[chat] MiniMax generation failed", {
       upstreamStatus: generated.upstreamStatus,
