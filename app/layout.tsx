@@ -25,7 +25,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const base = new URL(`${protocol}://${host}`);
   const title = "夜航恋人｜今晚想和谁聊聊？";
   const description =
-    "四位性格不同的男主，陪你聊聊天、理理思绪，也陪你慢慢睡着。";
+    "八位性格不同的男主，陪你聊聊天、理理思绪，也陪你慢慢睡着。";
   const socialImage = new URL("/og.png", base).toString();
 
   return {
@@ -45,7 +45,7 @@ export async function generateMetadata(): Promise<Metadata> {
           url: socialImage,
           width: 1731,
           height: 909,
-          alt: "夜航恋人的四位男主",
+          alt: "夜航恋人的八位男主",
         },
       ],
     },

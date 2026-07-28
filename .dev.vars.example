@@ -4,9 +4,13 @@ MINIMAX_API_KEY=
 MINIMAX_API_BASE=https://api.minimax.io
 MINIMAX_TEXT_MODEL=M2-her
 
-# 可选：替换为经授权复刻或 Voice Design 生成的四位角色专属 Voice ID。
-# 留空时会使用四种不同的 MiniMax 中文系统音色。
+# 可选：替换为经授权复刻或 Voice Design 生成的八位角色专属 Voice ID。
+# 留空时会使用默认的 MiniMax 男声音色，建议上线前逐位完成声线定稿。
 MINIMAX_VOICE_PEI=
 MINIMAX_VOICE_CHI=
 MINIMAX_VOICE_YAN=
 MINIMAX_VOICE_LU=
+MINIMAX_VOICE_CHENG=
+MINIMAX_VOICE_QI=
+MINIMAX_VOICE_SHEN=
+MINIMAX_VOICE_XU=

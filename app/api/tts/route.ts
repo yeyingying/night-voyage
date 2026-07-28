@@ -17,6 +17,10 @@ type RuntimeEnv = {
   MINIMAX_VOICE_CHI?: string;
   MINIMAX_VOICE_YAN?: string;
   MINIMAX_VOICE_LU?: string;
+  MINIMAX_VOICE_CHENG?: string;
+  MINIMAX_VOICE_QI?: string;
+  MINIMAX_VOICE_SHEN?: string;
+  MINIMAX_VOICE_XU?: string;
   ENABLE_VOICE_STUDIO?: string;
 };
 

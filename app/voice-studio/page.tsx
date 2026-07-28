@@ -7,6 +7,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
+import Link from "next/link";
 import {
   CHARACTER_IDS,
   DEVELOPER_VOICE_STORAGE_KEY,
@@ -77,6 +78,34 @@ const CHARACTERS: Record<
     image: "/lu-tinglan.png",
     preview: "灯先别关。再坐一会儿，我放点轻音乐。",
     accent: "#9fc4bd",
+  },
+  cheng: {
+    name: "程聿安",
+    role: "深夜书店主",
+    image: "/cheng-yuan.png",
+    preview: "书店还亮着灯。你慢慢来，我给你留了位置。",
+    accent: "#86a68f",
+  },
+  qi: {
+    name: "祁临川",
+    role: "城市夜航救援队长",
+    image: "/qi-linchuan.png",
+    preview: "先停下来。今晚不用硬撑，按我说的慢慢呼吸。",
+    accent: "#ba8a4e",
+  },
+  shen: {
+    name: "沈砚辞",
+    role: "睡眠模式研究员",
+    image: "/shen-yanci.png",
+    preview: "不用追求马上睡着。先把身体的警报关小一点。",
+    accent: "#9796c4",
+  },
+  xu: {
+    name: "许星野",
+    role: "午夜星象馆导览员",
+    image: "/xu-xingye.png",
+    preview: "今晚你选路线，我负责一直跟上。走慢一点也没关系。",
+    accent: "#67a4ba",
   },
 };
 
@@ -157,8 +186,10 @@ export default function VoiceStudio() {
 
   useEffect(() => {
     const controller = new AbortController();
-    setAssignments(storedAssignments());
-    setUsage(readTtsUsage());
+    const hydrateLocalState = window.setTimeout(() => {
+      setAssignments(storedAssignments());
+      setUsage(readTtsUsage());
+    }, 0);
 
     const syncUsage = () => setUsage(readTtsUsage());
     window.addEventListener(TTS_USAGE_EVENT, syncUsage);
@@ -193,6 +224,7 @@ export default function VoiceStudio() {
 
     void loadVoices();
     return () => {
+      window.clearTimeout(hydrateLocalState);
       controller.abort();
       audioRef.current?.pause();
       if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
@@ -357,7 +389,7 @@ export default function VoiceStudio() {
         `MINIMAX_VOICE_${id.toUpperCase()}=${assignments[id] ?? defaults?.[id] ?? ""}`,
     ).join("\n");
     await navigator.clipboard.writeText(lines);
-    setNotice("四位男主的声线配置已复制");
+    setNotice("八位男主的声线配置已复制");
   }
 
   return (
@@ -368,12 +400,12 @@ export default function VoiceStudio() {
       <header className={styles.header}>
         <div>
           <span>开发者工具</span>
-          <h1>给四位男主挑声音</h1>
+          <h1>给八位男主挑声音</h1>
           <p>
             先选角色，再用固定台词试听。这里的设置只给开发者看，玩家不会看到。
           </p>
         </div>
-        <a href="/">返回游戏</a>
+        <Link href="/">返回游戏</Link>
       </header>
 
       <section className={styles.usagePanel} aria-label="今日语音用量估算">

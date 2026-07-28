@@ -7,12 +7,23 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { DEVELOPER_VOICE_STORAGE_KEY } from "@/lib/voice-config";
 import { recordTtsUsage } from "@/lib/tts-usage";
 
 type Tab = "tonight" | "chat" | "memory" | "profile";
-type CharacterId = "pei" | "chi" | "yan" | "lu";
+type CharacterId =
+  | "pei"
+  | "chi"
+  | "yan"
+  | "lu"
+  | "cheng"
+  | "qi"
+  | "shen"
+  | "xu";
+type VisualStyle = "manhwa" | "real";
+type SleepMode = "settle" | "body" | "story";
 type VoiceProvider = "auto" | "natural" | "device";
 type VoiceCaptureState =
   | "idle"
@@ -41,6 +52,7 @@ type CharacterProfile = {
   archetype: string;
   role: string;
   image: string;
+  realImage: string;
   accent: string;
   accentSoft: string;
   heroTitle: string;
@@ -107,6 +119,7 @@ const CHARACTERS: Record<CharacterId, CharacterProfile> = {
     archetype: "成熟守护系",
     role: "记忆重构师",
     image: "/pei-xubai.png",
+    realImage: "/real-pei-xubai.jpg",
     accent: "#d8bd82",
     accentSoft: "rgba(216, 189, 130, 0.16)",
     heroTitle: "累了就先歇会儿。",
@@ -143,6 +156,7 @@ const CHARACTERS: Record<CharacterId, CharacterProfile> = {
     archetype: "阳光年下系",
     role: "航空学院大四生",
     image: "/chi-yao-campus.png",
+    realImage: "/real-chi-yao.jpg",
     accent: "#e8a65b",
     accentSoft: "rgba(232, 166, 91, 0.17)",
     heroTitle: "我下课了，来找你。",
@@ -176,9 +190,10 @@ const CHARACTERS: Record<CharacterId, CharacterProfile> = {
     id: "yan",
     name: "谢临渊",
     age: 30,
-    archetype: "冷傲偏爱系",
+    archetype: "冷傲引领系",
     role: "禁梦拍卖师",
     image: "/xie-linyuan.png",
+    realImage: "/real-xie-linyuan.jpg",
     accent: "#b36d63",
     accentSoft: "rgba(179, 109, 99, 0.16)",
     heroTitle: "又在硬撑？我看得出来。",
@@ -212,9 +227,10 @@ const CHARACTERS: Record<CharacterId, CharacterProfile> = {
     id: "lu",
     name: "陆听澜",
     age: 29,
-    archetype: "温柔治愈系",
+    archetype: "安静陪伴系",
     role: "梦境声音修复师",
     image: "/lu-tinglan.png",
+    realImage: "/real-lu-tinglan.jpg",
     accent: "#8fae9e",
     accentSoft: "rgba(143, 174, 158, 0.16)",
     heroTitle: "今天很吵吧。",
@@ -244,9 +260,205 @@ const CHARACTERS: Record<CharacterId, CharacterProfile> = {
     ],
     profileQuote: "你安静的时候，我也会陪着。",
   },
+  cheng: {
+    id: "cheng",
+    name: "程聿安",
+    age: 28,
+    archetype: "温暖邻家系",
+    role: "深夜书店主",
+    image: "/cheng-yuan.png",
+    realImage: "/real-cheng-yuan.jpg",
+    accent: "#86a68f",
+    accentSoft: "rgba(134, 166, 143, 0.16)",
+    heroTitle: "今晚不用表现得很懂事。",
+    heroSubline: "先坐下，慢慢说。",
+    greeting: "门还没关。进来吧，外面有点冷。今天想说什么，我都听着。",
+    voicePreview: "书店还亮着灯。你慢慢来，我给你留了位置。",
+    voice: { rate: 0.96, pitch: 0.94, index: 4 },
+    sleepScene: "雨夜书店",
+    sleepLines: [
+      "躺舒服了吗？今天不用再照顾任何人。",
+      "呼吸慢一点，书店已经打烊了。",
+      "肩膀松下来，床会好好接住你。",
+      "没说完的话放在这里，明天也不会丢。",
+      "雨声还在，我替你守一会儿。",
+      "晚安。睡着以后，就不用回我了。",
+    ],
+    workReply:
+      "先别一口气扛完。把明天最着急的那件交给我，我们只找一个能动手的开头。",
+    upsetReply:
+      "这件事落在你身上，确实挺难受。今晚不用替谁圆场，先偏心自己一会儿。",
+    cheerReply:
+      "坏心情可以进门，但得守书店规矩，十分钟后自动闭店。",
+    fallbackReplies: [
+      "你慢慢说，不用把前因后果整理得很漂亮。",
+      "听起来今天挺消耗人的。先坐一会儿，别急着把自己修好。",
+      "这句话你大概憋了一路。现在说出来，位置正好够放。",
+    ],
+    profileQuote: "不用逞强，书店一直给你留着灯。",
+  },
+  qi: {
+    id: "qi",
+    name: "祁临川",
+    age: 30,
+    archetype: "强势引领系",
+    role: "城市夜航救援队长",
+    image: "/qi-linchuan.png",
+    realImage: "/real-qi-linchuan.jpg",
+    accent: "#ba8a4e",
+    accentSoft: "rgba(186, 138, 78, 0.16)",
+    heroTitle: "今晚先听我的。",
+    heroSubline: "停下来，剩下的明天处理。",
+    greeting: "我到了。先别急着解释，告诉我现在最需要处理的是什么。",
+    voicePreview: "先停下来。今晚不用硬撑，按我说的慢慢呼吸。",
+    voice: { rate: 0.94, pitch: 0.9, index: 5 },
+    sleepScene: "城市静默航线",
+    sleepLines: [
+      "现在开始，今晚的任务只剩休息。",
+      "手机放远一点，消息明早再处理。",
+      "松开肩膀，呼气比吸气慢一点。",
+      "不需要检查自己睡没睡着。",
+      "这段航线很稳，你可以闭眼了。",
+      "晚安。到时间以前，我在。",
+    ],
+    workReply:
+      "先停。把必须今晚完成的和可以明天处理的分开，只留下前者，其他全部撤离。",
+    upsetReply:
+      "这不是你该一个人吞下去的事。今晚先别复盘，我把你从现场带出来。",
+    cheerReply:
+      "批准你暂时不讲道理十分钟。十分钟后，我负责把你哄回来。",
+    fallbackReplies: [
+      "先不用证明自己没事。我在这里，你可以把力气收回来。",
+      "这件事先到我这里为止，今晚不许它继续追着你跑。",
+      "你已经撑过最难的那一段了。现在按我的节奏，慢一点。",
+    ],
+    profileQuote: "我会给你明确答案，也会尊重你的决定。",
+  },
+  shen: {
+    id: "shen",
+    name: "沈砚辞",
+    age: 29,
+    archetype: "理性专业系",
+    role: "睡眠模式研究员",
+    image: "/shen-yanci.png",
+    realImage: "/real-shen-yanci.jpg",
+    accent: "#9796c4",
+    accentSoft: "rgba(151, 150, 196, 0.16)",
+    heroTitle: "先别急着责怪自己。",
+    heroSubline: "把问题交给我一起拆。",
+    greeting: "你来了。今晚想先把事情理清楚，还是只想让脑子安静一点？",
+    voicePreview: "不用追求马上睡着。先把身体的警报关小一点。",
+    voice: { rate: 0.98, pitch: 0.94, index: 6 },
+    sleepScene: "低照度睡眠实验室",
+    sleepLines: [
+      "不用努力入睡，我们只降低清醒的强度。",
+      "感受呼气，稍微比吸气长一点。",
+      "从下巴到肩膀，检查哪里还在用力。",
+      "念头出现很正常，不跟着它走就好。",
+      "时间不用管，睡意会自己接手。",
+      "今晚的记录到这里。晚安。",
+    ],
+    workReply:
+      "先把目标缩小。你今晚只做一个能验证的动作，结果留到明天再判断。",
+    upsetReply:
+      "你现在难受，不代表你判断失准。先把情绪和事实分开，我会陪你慢慢看。",
+    cheerReply:
+      "根据目前证据，你今天最合理的安排是暂停自我批评。这个结论暂不接受反驳。",
+    fallbackReplies: [
+      "我不急着给结论。你刚说的细节已经足够让我看见问题在哪。",
+      "先不做人格归因，这更像一次过载，不是你能力不行。",
+      "如果今晚只能改善百分之十，那也够了。先把最耗你的那一点移开。",
+    ],
+    profileQuote: "不拿安慰敷衍你，也不替你做决定。",
+  },
+  xu: {
+    id: "xu",
+    name: "许星野",
+    age: 24,
+    archetype: "忠犬陪伴系",
+    role: "午夜星象馆导览员",
+    image: "/xu-xingye.png",
+    realImage: "/real-xu-xingye.jpg",
+    accent: "#67a4ba",
+    accentSoft: "rgba(103, 164, 186, 0.16)",
+    heroTitle: "今晚你说了算。",
+    heroSubline: "想怎么被陪，我都配合。",
+    greeting: "星象馆清场了，现在归你。想聊天、想吐槽，还是想让我逗你一下？",
+    voicePreview: "今晚你选路线，我负责一直跟上。走慢一点也没关系。",
+    voice: { rate: 1.01, pitch: 0.97, index: 7 },
+    sleepScene: "闭馆后的星象穹顶",
+    sleepLines: [
+      "灯已经关到最暗了，你选的位置很舒服。",
+      "不用配合我，按你自己的节奏呼吸。",
+      "想翻身就翻身，怎么舒服怎么来。",
+      "今晚的星星不会催你睡着。",
+      "我把声音放轻一点，你不用回答。",
+      "晚安。明天醒了再来找我。",
+    ],
+    workReply:
+      "你定目标，我来当执行搭子。先挑最不讨厌的那一步，我陪你把它做完。",
+    upsetReply:
+      "我不抢着讲道理。今天谁让你不好受，我就先安安静静站你这边。",
+    cheerReply:
+      "收到，今晚开启哄人权限。第一条规则，你不许嫌我太积极。",
+    fallbackReplies: [
+      "你说怎么陪，我就怎么陪。先把今天最想丢掉的那件事放我这儿。",
+      "不用表现得有趣，你出现就已经够我高兴一会儿了。",
+      "我可以安静，也可以逗你。反正今晚不让你一个人硬撑。",
+    ],
+    profileQuote: "你来决定距离，我会认真跟上。",
+  },
 };
 
 const CHARACTER_IDS = Object.keys(CHARACTERS) as CharacterId[];
+
+const SLEEP_PROGRAMS: Record<
+  SleepMode,
+  {
+    title: string;
+    cue: string;
+    description: string;
+    duration: number;
+    lines: string[];
+  }
+> = {
+  settle: {
+    title: "慢慢关机",
+    cue: "脑子停不下来",
+    description: "呼吸、轻度倒数和留白，减少睡前反刍。",
+    duration: 12 * 60,
+    lines: [
+      "不用强迫自己立刻睡着，我们只是先慢下来。",
+      "吸气不用太深，呼气稍微长一点。",
+      "今天没处理完的事，先暂存在门外。",
+      "从十开始慢慢往下数，数错了也不用重来。",
+    ],
+  },
+  body: {
+    title: "身体松下来",
+    cue: "肩膀和身体还绷着",
+    description: "从面部到双脚逐段放松，不追求马上入睡。",
+    duration: 15 * 60,
+    lines: [
+      "先松开眉头，下巴也别再咬紧。",
+      "肩膀向下沉一点，手指不用抓着任何东西。",
+      "腹部随着呼吸自然起落，不需要控制。",
+      "小腿、脚踝和脚趾都可以把力气交给床。",
+    ],
+  },
+  story: {
+    title: "听着故事睡",
+    cue: "只想有人陪着",
+    description: "没有冲突和反转的平缓夜行故事。",
+    duration: 20 * 60,
+    lines: [
+      "夜里的小路很安静，远处只有一盏暖黄色的灯。",
+      "你沿着柔软的草地慢慢往前走，脚步很轻。",
+      "前面的小屋已经替你铺好床，窗外有很细的雨。",
+      "故事不会发生意外，你可以在任何一句睡着。",
+    ],
+  },
+};
 
 const INITIAL_MEMORIES: Memory[] = [
   { id: 1, text: "你喜欢雨声，但不喜欢突然的雷声。", date: "今晚" },
@@ -279,20 +491,42 @@ function nowTime() {
   }).format(new Date());
 }
 
+function subscribeVisualStyle(onStoreChange: () => void) {
+  window.addEventListener("popstate", onStoreChange);
+  return () => window.removeEventListener("popstate", onStoreChange);
+}
+
+function getVisualStyleSnapshot(): VisualStyle {
+  return new URLSearchParams(window.location.search).get("style") === "real"
+    ? "real"
+    : "manhwa";
+}
+
+function getVisualStyleServerSnapshot(): VisualStyle {
+  return "manhwa";
+}
+
 export default function Home() {
   const [tab, setTab] = useState<Tab>("tonight");
   const [selectedId, setSelectedId] = useState<CharacterId>("pei");
+  const visualStyle = useSyncExternalStore(
+    subscribeVisualStyle,
+    getVisualStyleSnapshot,
+    getVisualStyleServerSnapshot,
+  );
   const [messagesByCharacter, setMessagesByCharacter] = useState<
     Record<CharacterId, Message[]>
-  >({
-    pei: initialMessages(CHARACTERS.pei),
-    chi: initialMessages(CHARACTERS.chi),
-    yan: initialMessages(CHARACTERS.yan),
-    lu: initialMessages(CHARACTERS.lu),
-  });
+  >(
+    () =>
+      Object.fromEntries(
+        CHARACTER_IDS.map((id) => [id, initialMessages(CHARACTERS[id])]),
+      ) as Record<CharacterId, Message[]>,
+  );
   const [memories, setMemories] = useState<Memory[]>(INITIAL_MEMORIES);
   const [input, setInput] = useState("");
   const [sleepOpen, setSleepOpen] = useState(false);
+  const [sleepStarted, setSleepStarted] = useState(false);
+  const [sleepMode, setSleepMode] = useState<SleepMode>("settle");
   const [sleeping, setSleeping] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(12 * 60);
   const [sleepLine, setSleepLine] = useState(0);
@@ -336,28 +570,44 @@ export default function Home() {
   const voicePointerStartYRef = useRef(0);
 
   const character = CHARACTERS[selectedId];
+  const characterImage =
+    visualStyle === "real" ? character.realImage : character.image;
   const messages = messagesByCharacter[selectedId];
+  const sleepProgram = SLEEP_PROGRAMS[sleepMode];
+  const sleepLines = useMemo(
+    () => [
+      character.sleepLines[0],
+      ...sleepProgram.lines,
+      ...character.sleepLines.slice(1),
+    ],
+    [character, sleepProgram.lines],
+  );
   const characterStyle = {
     "--character-accent": character.accent,
     "--character-soft": character.accentSoft,
-    "--character-image": `url("${character.image}")`,
+    "--character-image": `url("${characterImage}")`,
   } as CSSProperties;
 
   useEffect(() => {
-    const savedMemories = window.localStorage.getItem("night-voyage-memories");
-    const savedCharacter = window.localStorage.getItem(
-      "night-voyage-character",
-    ) as CharacterId | null;
-    if (savedMemories) {
-      try {
-        setMemories(JSON.parse(savedMemories));
-      } catch {
-        window.localStorage.removeItem("night-voyage-memories");
+    const hydrateLocalState = window.setTimeout(() => {
+      const savedMemories = window.localStorage.getItem(
+        "night-voyage-memories",
+      );
+      const savedCharacter = window.localStorage.getItem(
+        "night-voyage-character",
+      ) as CharacterId | null;
+      if (savedMemories) {
+        try {
+          setMemories(JSON.parse(savedMemories));
+        } catch {
+          window.localStorage.removeItem("night-voyage-memories");
+        }
       }
-    }
-    if (savedCharacter && CHARACTER_IDS.includes(savedCharacter)) {
-      setSelectedId(savedCharacter);
-    }
+      if (savedCharacter && CHARACTER_IDS.includes(savedCharacter)) {
+        setSelectedId(savedCharacter);
+      }
+    }, 0);
+    return () => window.clearTimeout(hydrateLocalState);
   }, []);
 
   useEffect(() => {
@@ -398,8 +648,6 @@ export default function Home() {
 
   useEffect(() => {
     window.localStorage.setItem("night-voyage-character", selectedId);
-    setSleepLine(0);
-    setShowBoundary(false);
   }, [selectedId]);
 
   useEffect(() => {
@@ -439,17 +687,35 @@ export default function Home() {
     if (!sleeping) return;
     const lineTimer = window.setInterval(() => {
       setSleepLine((current) =>
-        current < character.sleepLines.length - 1 ? current + 1 : current,
+        current < sleepLines.length - 1 ? current + 1 : current,
       );
     }, 22000);
     return () => window.clearInterval(lineTimer);
-  }, [character.sleepLines.length, sleeping]);
+  }, [sleepLines.length, sleeping]);
 
   useEffect(() => {
     if (!sleeping || !voiceOn || typeof window === "undefined") return;
-    speak(character.sleepLines[sleepLine], true);
+    speak(sleepLines[sleepLine], true);
     return stopVoice;
-  }, [character, sleepLine, sleeping, voiceOn]);
+  }, [character, sleepLine, sleepLines, sleeping, voiceOn]);
+
+  useEffect(() => {
+    if (!sleepOpen) return;
+    window.history.pushState(
+      { ...window.history.state, nightVoyageSleep: true },
+      "",
+    );
+    const handlePopState = () => closeSleep(false);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeSleep();
+    };
+    window.addEventListener("popstate", handlePopState);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [sleepOpen]);
 
   const clock = useMemo(() => {
     const minutes = Math.floor(secondsLeft / 60)
@@ -892,6 +1158,8 @@ export default function Home() {
     chatRequestRef.current = null;
     setReplyLoading(false);
     setSelectedId(nextId);
+    setSleepLine(0);
+    setShowBoundary(false);
     setInput("");
   }
 
@@ -1054,24 +1322,45 @@ export default function Home() {
 
   function startSleep() {
     setSleepOpen(true);
-    setSleeping(true);
-    setSecondsLeft(12 * 60);
+    setSleepStarted(false);
+    setSleeping(false);
+    setSecondsLeft(SLEEP_PROGRAMS.settle.duration);
     setSleepLine(0);
   }
 
-  function closeSleep() {
+  function beginSleep(nextMode: SleepMode) {
+    const nextProgram = SLEEP_PROGRAMS[nextMode];
+    setSleepMode(nextMode);
+    setSleepStarted(true);
+    setSleeping(true);
+    setSecondsLeft(nextProgram.duration);
+    setSleepLine(0);
+  }
+
+  function closeSleep(popHistory = true) {
     setSleeping(false);
+    setSleepStarted(false);
     setSleepOpen(false);
     stopVoice();
+    if (
+      popHistory &&
+      typeof window !== "undefined" &&
+      window.history.state?.nightVoyageSleep
+    ) {
+      window.history.back();
+    }
   }
 
   return (
-    <main className="app-shell" style={characterStyle}>
+    <main
+      className={`app-shell visual-${visualStyle}`}
+      style={characterStyle}
+    >
       <div className="ambient ambient-one" />
       <div className="ambient ambient-two" />
 
       <section
-        className={`phone-stage character-${selectedId} tab-${tab}`}
+        className={`phone-stage visual-${visualStyle} character-${selectedId} tab-${tab}`}
         aria-label="夜航恋人"
       >
         <header className="topbar">
@@ -1106,7 +1395,7 @@ export default function Home() {
             <section className="tonight-view">
               <div className="hero-card" key={character.id}>
                 <img
-                  src={character.image}
+                  src={characterImage}
                   alt={`${character.name}，${character.role}`}
                   className="hero-image"
                 />
@@ -1145,7 +1434,14 @@ export default function Home() {
                         aria-pressed={id === selectedId}
                       >
                         <span className="character-thumb">
-                          <img src={item.image} alt="" />
+                          <img
+                            src={
+                              visualStyle === "real"
+                                ? item.realImage
+                                : item.image
+                            }
+                            alt=""
+                          />
                         </span>
                         <strong>{item.name}</strong>
                         <small>{item.archetype}</small>
@@ -1187,7 +1483,7 @@ export default function Home() {
             <section className="chat-view">
               <div className="chat-person">
                 <div className="avatar-wrap">
-                  <img src={character.image} alt="" />
+                  <img src={characterImage} alt="" />
                   <span />
                 </div>
                 <div>
@@ -1222,7 +1518,7 @@ export default function Home() {
                       key={message.id}
                     >
                       {message.role === "companion" && (
-                        <img src={character.image} alt="" />
+                        <img src={characterImage} alt="" />
                       )}
                       <div>
                         {message.kind === "voice" ? (
@@ -1256,7 +1552,7 @@ export default function Home() {
                 )}
                 {replyLoading && (
                   <div className="message-row companion reply-thinking">
-                    <img src={character.image} alt="" />
+                    <img src={characterImage} alt="" />
                     <div>
                       <p>{character.name}正在回复…</p>
                     </div>
@@ -1443,7 +1739,7 @@ export default function Home() {
           {tab === "profile" && (
             <section className="profile-view">
               <div className="profile-portrait">
-                <img src={character.image} alt={character.name} />
+                <img src={characterImage} alt={character.name} />
               </div>
               <span className="status-pill">
                 {character.archetype} · 仅在线陪伴
@@ -1461,7 +1757,14 @@ export default function Home() {
                     className={id === selectedId ? "active" : ""}
                     onClick={() => selectCharacter(id)}
                   >
-                    <img src={CHARACTERS[id].image} alt="" />
+                    <img
+                      src={
+                        visualStyle === "real"
+                          ? CHARACTERS[id].realImage
+                          : CHARACTERS[id].image
+                      }
+                      alt=""
+                    />
                     <span>{CHARACTERS[id].name}</span>
                   </button>
                 ))}
@@ -1537,7 +1840,7 @@ export default function Home() {
 
       {sleepOpen && (
         <section
-          className={`sleep-overlay sleep-${selectedId}`}
+          className={`sleep-overlay visual-${visualStyle} sleep-${selectedId}`}
           role="dialog"
           aria-modal="true"
           style={characterStyle}
@@ -1546,51 +1849,93 @@ export default function Home() {
           <button
             className="sleep-close"
             type="button"
-            onClick={closeSleep}
-            aria-label="结束睡眠陪伴"
+            onClick={() => closeSleep()}
+            aria-label="返回游戏"
           >
-            结束
+            <span aria-hidden="true">←</span>
+            返回
           </button>
-          <div className="sleep-content">
-            <span className="sleep-label">
-              {character.name} · {character.sleepScene}
-            </span>
-            <div className={`breathing-orb ${sleeping ? "is-playing" : ""}`}>
-              <span>晚安</span>
+          {!sleepStarted ? (
+            <div className="sleep-picker">
+              <span className="sleep-label">{character.name}陪你入睡</span>
+              <h2>今晚哪里还没放松下来？</h2>
+              <p>不用做测试，选最接近现在的状态。</p>
+              <div className="sleep-program-list">
+                {(Object.keys(SLEEP_PROGRAMS) as SleepMode[]).map((mode) => {
+                  const program = SLEEP_PROGRAMS[mode];
+                  return (
+                    <button
+                      type="button"
+                      key={mode}
+                      onClick={() => beginSleep(mode)}
+                    >
+                      <span>
+                        <small>{program.cue}</small>
+                        <strong>{program.title}</strong>
+                        <b>{Math.round(program.duration / 60)} 分钟</b>
+                      </span>
+                      <p>{program.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+              <small className="sleep-science-note">
+                这些内容用于放松和辅助入睡，不能替代失眠治疗或医疗建议。
+              </small>
             </div>
-            <p className="sleep-quote">{character.sleepLines[sleepLine]}</p>
-            <strong className="sleep-clock">{clock}</strong>
-            <small>结束时会自动停止播放</small>
-            <div className="sleep-controls">
-              <button
-                type="button"
-                onClick={() => setVoiceEnabled(!voiceOn)}
-              >
-                {voiceOn ? "语音开启" : "语音关闭"}
-              </button>
-              <button
-                className="play-button"
-                type="button"
-                onClick={() => setSleeping((current) => !current)}
-                aria-label={sleeping ? "暂停" : "继续"}
-              >
-                {sleeping ? "暂停" : "继续"}
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setSleepLine(
-                    (current) => (current + 1) % character.sleepLines.length,
-                  )
-                }
-              >
-                下一句
-              </button>
-            </div>
-          </div>
-          <p className="sleep-footer">
-            把手机放到一边也可以，结束后声音会自己停。
-          </p>
+          ) : (
+            <>
+              <div className="sleep-content">
+                <span className="sleep-label">
+                  {character.name} · {sleepProgram.title}
+                </span>
+                <div
+                  className={`breathing-orb ${sleeping ? "is-playing" : ""}`}
+                >
+                  <span>晚安</span>
+                </div>
+                <p className="sleep-quote">{sleepLines[sleepLine]}</p>
+                <strong className="sleep-clock">{clock}</strong>
+                <small>结束时会自动停止播放</small>
+                <div className="sleep-controls">
+                  <button
+                    type="button"
+                    onClick={() => setVoiceEnabled(!voiceOn)}
+                  >
+                    {voiceOn ? "语音开启" : "语音关闭"}
+                  </button>
+                  <button
+                    className="play-button"
+                    type="button"
+                    onClick={() => setSleeping((current) => !current)}
+                    aria-label={sleeping ? "暂停" : "继续"}
+                  >
+                    {sleeping ? "暂停" : "继续"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSleepLine(
+                        (current) => (current + 1) % sleepLines.length,
+                      )
+                    }
+                  >
+                    下一句
+                  </button>
+                </div>
+                <button
+                  className="sleep-stop-button"
+                  type="button"
+                  onClick={() => closeSleep()}
+                >
+                  结束陪睡并返回
+                </button>
+              </div>
+              <p className="sleep-footer">
+                把手机放到一边也可以，结束后声音会自己停。
+              </p>
+            </>
+          )}
         </section>
       )}
     </main>
