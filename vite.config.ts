@@ -1,3 +1,12 @@
+import { createHash } from "node:crypto";
+import {
+  existsSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+} from "node:fs";
+import { dirname, extname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 import vinext from "vinext";
 import { defineConfig } from "vite";
 import hostingConfig from "./.openai/hosting.json";
@@ -7,6 +16,39 @@ const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
 
 const { d1, r2 } = hostingConfig;
+
+const PROJECT_ROOT = dirname(fileURLToPath(import.meta.url));
+const CLIENT_SOURCE_EXTENSIONS = new Set([".css", ".ts", ".tsx"]);
+
+function sourceFilesWithin(path: string): string[] {
+  if (!existsSync(path)) return [];
+  if (!statSync(path).isDirectory()) return [path];
+
+  return readdirSync(path, { withFileTypes: true })
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .flatMap((entry) => {
+      const child = join(path, entry.name);
+      return entry.isDirectory() ? sourceFilesWithin(child) : [child];
+    });
+}
+
+function clientAssetRelease() {
+  const hash = createHash("sha256");
+  const sourceFiles = [
+    ...sourceFilesWithin(join(PROJECT_ROOT, "app")),
+    ...sourceFilesWithin(join(PROJECT_ROOT, "lib")),
+    fileURLToPath(import.meta.url),
+  ].filter((path) => CLIENT_SOURCE_EXTENSIONS.has(extname(path)));
+
+  for (const path of sourceFiles) {
+    hash.update(relative(PROJECT_ROOT, path));
+    hash.update(readFileSync(path));
+  }
+
+  return hash.digest("hex").slice(0, 10);
+}
+
+const CLIENT_ASSET_RELEASE = clientAssetRelease();
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
@@ -44,6 +86,11 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    // Vinext entry chunk names can remain stable across releases. A
+    // source-derived assets directory prevents phones from reusing stale JS.
+    build: {
+      assetsDir: `assets-${CLIENT_ASSET_RELEASE}`,
+    },
     server: isCodexSeatbeltSandbox
       ? { watch: { useFsEvents: false, usePolling: true } }
       : undefined,
