@@ -3246,15 +3246,31 @@ input:focus-visible {
 }
 
 @media (max-width: 600px) {
+  html,
+  body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
   .app-shell {
+    width: 100%;
+    height: 100dvh;
+    min-height: 0;
     padding: 0;
     display: block;
   }
 
   .phone-stage {
     width: 100%;
-    height: 100dvh;
-    min-height: 100dvh;
+    height: var(--mobile-viewport-height, 100dvh);
+    min-height: 0;
+    position: fixed;
+    top: var(--mobile-viewport-offset, 0px);
+    right: 0;
+    bottom: auto;
+    left: 0;
     border: 0;
     border-radius: 0;
   }
@@ -3280,6 +3296,19 @@ input:focus-visible {
   }
 
   .tab-chat .brand small {
+    display: none;
+  }
+
+  .composer {
+    padding-bottom: max(9px, env(safe-area-inset-bottom));
+  }
+
+  .composer input {
+    font-size: 16px;
+    line-height: 1.25;
+  }
+
+  .phone-stage.keyboard-open .bottom-nav {
     display: none;
   }
 

@@ -46,6 +46,21 @@ test("ships the finished game shell and both visual styles", async () => {
   assert.match(css, /@media \(min-width: 960px\)/);
 });
 
+test("keeps the mobile chat composer visible without iOS input zoom", async () => {
+  const { page, layout, css } = await productSources();
+
+  assert.match(layout, /interactiveWidget:\s*"resizes-content"/);
+  assert.match(page, /window\.visualViewport/);
+  assert.match(page, /--mobile-viewport-height/);
+  assert.match(page, /chatInputFocused \? " keyboard-open"/);
+  assert.match(page, /onFocus=\{\(\) => setChatInputFocused\(true\)\}/);
+  assert.match(
+    css,
+    /\.composer input\s*\{[\s\S]*?font-size:\s*16px;/,
+  );
+  assert.match(css, /\.phone-stage\.keyboard-open \.bottom-nav/);
+});
+
 test("guards adult intimacy, local photo previews, and character boundaries", async () => {
   const { page, css, chatRoute } = await productSources();
 

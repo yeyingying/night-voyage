@@ -649,6 +649,7 @@ export default function Home() {
   const [voiceCaptureNotice, setVoiceCaptureNotice] = useState("");
   const [voiceTapMode, setVoiceTapMode] = useState(false);
   const [replyLoading, setReplyLoading] = useState(false);
+  const [chatInputFocused, setChatInputFocused] = useState(false);
   const [showBoundary, setShowBoundary] = useState(false);
   const [adultConfirmed, setAdultConfirmed] = useState(false);
   const [intimacyEnabled, setIntimacyEnabled] = useState(false);
@@ -666,6 +667,7 @@ export default function Home() {
   } | null>(null);
   const [imageNotice, setImageNotice] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
+  const phoneStageRef = useRef<HTMLElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
@@ -871,6 +873,40 @@ export default function Home() {
     return () => {
       window.clearTimeout(initialTick);
       window.clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+
+    function syncMobileViewport() {
+      const stage = phoneStageRef.current;
+      if (!stage) return;
+      if (window.innerWidth > 600) {
+        stage.style.removeProperty("--mobile-viewport-height");
+        stage.style.removeProperty("--mobile-viewport-offset");
+        return;
+      }
+      stage.style.setProperty(
+        "--mobile-viewport-height",
+        `${Math.round(viewport?.height ?? window.innerHeight)}px`,
+      );
+      stage.style.setProperty(
+        "--mobile-viewport-offset",
+        `${Math.round(viewport?.offsetTop ?? 0)}px`,
+      );
+    }
+
+    syncMobileViewport();
+    viewport?.addEventListener("resize", syncMobileViewport);
+    viewport?.addEventListener("scroll", syncMobileViewport);
+    window.addEventListener("resize", syncMobileViewport);
+    window.addEventListener("orientationchange", syncMobileViewport);
+    return () => {
+      viewport?.removeEventListener("resize", syncMobileViewport);
+      viewport?.removeEventListener("scroll", syncMobileViewport);
+      window.removeEventListener("resize", syncMobileViewport);
+      window.removeEventListener("orientationchange", syncMobileViewport);
     };
   }, []);
 
@@ -2104,7 +2140,10 @@ export default function Home() {
       <div className="ambient ambient-two" />
 
       <section
-        className={`phone-stage visual-${visualStyle} character-${selectedId} tab-${tab}`}
+        ref={phoneStageRef}
+        className={`phone-stage visual-${visualStyle} character-${selectedId} tab-${tab}${
+          chatInputFocused ? " keyboard-open" : ""
+        }`}
         aria-label="夜航恋人"
       >
         <header className="topbar">
@@ -2476,6 +2515,8 @@ export default function Home() {
                     id="chat-input"
                     value={input}
                     onChange={(event) => setInput(event.target.value)}
+                    onFocus={() => setChatInputFocused(true)}
+                    onBlur={() => setChatInputFocused(false)}
                     placeholder={
                       replyLoading
                         ? `${character.name}正在输入…`
