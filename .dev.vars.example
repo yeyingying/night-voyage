@@ -1,0 +1,12 @@
+# MiniMax 开放平台密钥。复制本文件为 .dev.vars 后填写，切勿提交真实密钥。
+MINIMAX_API_KEY=
+# 国际站默认使用 https://api.minimax.io；中国站账号可改为 https://api.minimaxi.com。
+MINIMAX_API_BASE=https://api.minimax.io
+MINIMAX_TEXT_MODEL=M2-her
+
+# 可选：替换为经授权复刻或 Voice Design 生成的四位角色专属 Voice ID。
+# 留空时会使用四种不同的 MiniMax 中文系统音色。
+MINIMAX_VOICE_PEI=
+MINIMAX_VOICE_CHI=
+MINIMAX_VOICE_YAN=
+MINIMAX_VOICE_LU=
