@@ -141,3 +141,17 @@ test("pilots continuous living personas for Chi Yao and Xie Linyuan", async () =
   assert.match(ttsRoute, /applyVoiceBreak/);
   assert.match(ttsRoute, /performance\?\.speedDelta/);
 });
+
+test("answers the player's actual question instead of masking model failures", async () => {
+  const { page, chatRoute } = await productSources();
+
+  assert.match(chatRoute, /DIRECT_ANSWER_PROMPT/);
+  assert.match(chatRoute, /第一句必须先回答那个问题/);
+  assert.match(chatRoute, /const chatPath = "\/v1\/chat\/completions"/);
+  assert.match(page, /这条问题还没回答/);
+  assert.match(page, /不会拿预设话术敷衍你/);
+  assert.doesNotMatch(
+    page,
+    /Dynamic reply unavailable; using fallback reply/,
+  );
+});

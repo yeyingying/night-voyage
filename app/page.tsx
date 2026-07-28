@@ -1942,7 +1942,7 @@ export default function Home() {
     chatRequestRef.current = requestController;
     setReplyLoading(true);
 
-    let reply: string;
+    let reply: string | null = null;
     try {
       const requestNow = Date.now();
       const requestDate = new Date(requestNow);
@@ -1995,7 +1995,12 @@ export default function Home() {
         signal: requestController.signal,
       });
       if (!response.ok) {
-        throw new Error(`Chat request failed with ${response.status}`);
+        const failure = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(
+          failure?.error || `Chat request failed with ${response.status}`,
+        );
       }
       const result = (await response.json()) as {
         reply?: string;
@@ -2026,8 +2031,7 @@ export default function Home() {
       ) {
         return;
       }
-      console.warn("Dynamic reply unavailable; using fallback reply.", error);
-      reply = fallbackReplyFor(text, profile, conversation);
+      console.warn("Dynamic reply unavailable.", error);
     } finally {
       if (chatRequestRef.current === requestController) {
         chatRequestRef.current = null;
@@ -2036,6 +2040,18 @@ export default function Home() {
     }
 
     if (requestController.signal.aborted) return;
+    if (!reply) {
+      appendMessagesFor(profileId, [
+        {
+          id: Date.now() + 1,
+          role: "system",
+          text: "刚才没有接通回复服务，这条问题还没回答。请再发一次，不会拿预设话术敷衍你。",
+          time: nowTime(),
+          sentAt: Date.now(),
+        },
+      ]);
+      return;
+    }
     appendMessagesFor(profileId, [
       {
         id: Date.now() + 1,

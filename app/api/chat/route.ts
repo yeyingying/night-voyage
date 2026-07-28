@@ -152,6 +152,10 @@ const RELATIONSHIP_PROMPT = `把每次回复当成一段正在发展的关系，
 如果最近对话或已保存记忆里有相关细节，可以自然带回一句，让她感觉你真的记得；不要生硬地宣布“我记得”。
 不要四项内容全塞进一条回复。每次只做当下最重要的一两件事。`;
 
+const DIRECT_ANSWER_PROMPT = `玩家问了明确问题时，第一句必须先回答那个问题，再补充你的反应。不能把问题绕回给她，不能用安慰、陪伴宣言或泛泛关心代替答案。
+像“你有喜欢的人吗”“你喜欢我吗”“你在做什么”“你怎么看”这类私人或关系问题，也要根据角色身份给出真实、明确的立场。可以保留一点暧昧和分寸，但不能装没看见、转移话题或只说“我陪你”“你说怎么陪就怎么陪”。
+如果玩家连续问了两次同一个问题，说明上一轮没有答到。这一轮先直接纠正：“刚才答偏了”，然后马上给出答案，不要再次套话。`;
+
 const SAMPLE_DIALOGUES: Record<
   CharacterId,
   { user: string; assistant: string }
@@ -475,6 +479,7 @@ export async function POST(request: Request) {
     imagePrompt,
     ADAPTIVE_PROMPT,
     RELATIONSHIP_PROMPT,
+    DIRECT_ANSWER_PROMPT,
     timelinePrompt,
     personaPrompt,
     memoryPrompt,
@@ -487,10 +492,7 @@ export async function POST(request: Request) {
     "https://api.minimax.io";
   const model = runtime.MINIMAX_TEXT_MODEL?.trim() || "M2-her";
 
-  const chatPath =
-    model === "M2-her"
-      ? "/v1/text/chatcompletion_v2"
-      : "/v1/chat/completions";
+  const chatPath = "/v1/chat/completions";
 
   async function generate(extraInstruction = "", rejectedDraft = "") {
     const prompt = extraInstruction
