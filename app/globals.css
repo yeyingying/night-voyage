@@ -2373,6 +2373,29 @@ input:focus-visible {
   color: color-mix(in srgb, var(--character-accent) 88%, white);
 }
 
+.chat-person > .intimacy-toggle {
+  border: 1px solid
+    color-mix(in srgb, var(--character-accent) 28%, var(--border-subtle));
+  background: transparent;
+  color: var(--text-subtle);
+}
+
+.chat-person > .intimacy-toggle.active {
+  border-color: color-mix(
+    in srgb,
+    var(--character-accent) 52%,
+    transparent
+  );
+  background: color-mix(
+    in srgb,
+    var(--character-accent) 16%,
+    transparent
+  );
+  color: color-mix(in srgb, var(--character-accent) 82%, white);
+  box-shadow: 0 0 20px
+    color-mix(in srgb, var(--character-accent) 10%, transparent);
+}
+
 .chat-character-switch button {
   min-height: 34px;
   border-color: transparent;
@@ -2422,6 +2445,82 @@ input:focus-visible {
   font-size: 9px;
 }
 
+.image-message-card {
+  width: min(242px, 68vw);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px 16px 5px 16px;
+  background: var(--surface-primary);
+}
+
+.image-message-card > img {
+  width: 100%;
+  max-height: 300px;
+  display: block;
+  object-fit: cover;
+}
+
+.message-row.user .image-message-card > p {
+  margin: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 10px 12px 12px;
+  color: var(--text-secondary);
+  box-shadow: none;
+}
+
+.pending-image-strip {
+  min-height: 68px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-shell) 94%, transparent);
+}
+
+.pending-image-strip > img {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+  border-radius: 11px;
+  object-fit: cover;
+}
+
+.pending-image-strip > span {
+  min-width: 0;
+  flex: 1;
+}
+
+.pending-image-strip strong,
+.pending-image-strip small {
+  display: block;
+}
+
+.pending-image-strip strong {
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.pending-image-strip small {
+  margin-top: 4px;
+  color: var(--text-subtle);
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.pending-image-strip > button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-primary);
+  color: var(--text-muted);
+  font-size: 17px;
+  cursor: pointer;
+}
+
 .composer {
   border-top-color: var(--border-subtle);
   background: var(--surface-shell);
@@ -2442,6 +2541,52 @@ input:focus-visible {
 .composer > .voice-hold-button {
   border-color: var(--border-strong);
   background: var(--surface-primary);
+}
+
+.composer > .image-attach-button {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface-primary);
+  padding: 0;
+  color: var(--character-accent);
+}
+
+.image-attach-button > span {
+  width: 17px;
+  height: 14px;
+  position: relative;
+  display: block;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+}
+
+.image-attach-button > span::before {
+  content: "";
+  width: 4px;
+  height: 4px;
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.image-attach-button > span::after {
+  content: "";
+  width: 9px;
+  height: 7px;
+  position: absolute;
+  bottom: 1px;
+  left: 2px;
+  border-left: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: skew(-28deg) rotate(-4deg);
 }
 
 .voice-capture-status {
@@ -2890,6 +3035,16 @@ input:focus-visible {
     color-mix(in srgb, var(--character-accent) 30%, #8197a9)
   );
   color: #ffffff;
+}
+
+.visual-real .message-row.user .image-message-card > p {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.visual-real .image-message-card,
+.visual-real .pending-image-strip {
+  background: rgba(255, 255, 255, 0.94);
 }
 
 .visual-real .voice-transcript,
@@ -3476,6 +3631,121 @@ input:focus-visible {
   .character-grid > button:hover .character-thumb img,
   .conversation-entry:hover {
     transform: none;
+  }
+}
+
+.adult-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background:
+    radial-gradient(circle at 50% 42%, var(--character-soft), transparent 42%),
+    rgba(3, 6, 11, 0.82);
+  backdrop-filter: blur(18px);
+}
+
+.adult-gate-card {
+  width: min(100%, 430px);
+  border: 1px solid
+    color-mix(in srgb, var(--character-accent) 28%, var(--border-subtle));
+  border-radius: 24px;
+  background: var(--surface-shell);
+  padding: 27px;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.38);
+}
+
+.adult-gate-card > span {
+  color: var(--character-accent);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+}
+
+.adult-gate-card h2 {
+  margin: 10px 0 12px;
+  color: var(--text-primary);
+  font-family: "Songti SC", "Noto Serif SC", serif;
+  font-size: 25px;
+  font-weight: 520;
+}
+
+.adult-gate-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.adult-gate-card > small {
+  display: block;
+  margin-top: 12px;
+  color: var(--text-subtle);
+  font-size: 9px;
+  line-height: 1.65;
+}
+
+.adult-gate-card > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 9px;
+  margin-top: 22px;
+}
+
+.adult-gate-card button {
+  min-height: 46px;
+  border: 0;
+  border-radius: 13px;
+  background: var(--character-accent);
+  padding: 0 16px;
+  color: #211d17;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.adult-gate-card button:last-child {
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.visual-real.adult-gate {
+  background:
+    radial-gradient(circle at 50% 42%, var(--character-soft), transparent 43%),
+    rgba(225, 234, 241, 0.84);
+}
+
+.visual-real .adult-gate-card {
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 30px 90px rgba(73, 91, 110, 0.2);
+}
+
+@media (max-width: 390px) {
+  .composer {
+    gap: 6px;
+    padding-inline: 8px;
+  }
+
+  .composer > .voice-hold-button,
+  .composer > .image-attach-button {
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    min-height: 42px;
+  }
+
+  .composer .send-message-button {
+    padding-inline: 11px;
+  }
+
+  .chat-person {
+    gap: 7px;
+  }
+
+  .chat-person > button {
+    padding-inline: 9px;
   }
 }
 

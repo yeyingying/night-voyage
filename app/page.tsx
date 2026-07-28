@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ChangeEvent,
   CSSProperties,
   FormEvent,
   useEffect,
@@ -25,6 +26,7 @@ type CharacterId =
 type VisualStyle = "manhwa" | "real";
 type SleepMode = "settle" | "body" | "story";
 type VoiceProvider = "auto" | "natural" | "device";
+type AdultGateIntent = "intimacy" | "photo";
 type VoiceCaptureState =
   | "idle"
   | "requesting"
@@ -36,8 +38,10 @@ type Message = {
   role: "companion" | "user" | "system";
   text: string;
   time: string;
-  kind?: "text" | "voice";
+  kind?: "text" | "voice" | "image";
   audioUrl?: string;
+  imageUrl?: string;
+  imageName?: string;
   duration?: number;
 };
 type Memory = {
@@ -411,6 +415,13 @@ const CHARACTERS: Record<CharacterId, CharacterProfile> = {
 };
 
 const CHARACTER_IDS = Object.keys(CHARACTERS) as CharacterId[];
+const INTIMATE_CHARACTER_IDS = new Set<CharacterId>(["yan", "chi"]);
+const ADULT_CONFIRMATION_KEY = "night-voyage-adult-intimacy-confirmed";
+const INTIMACY_ENABLED_KEY = "night-voyage-intimacy-enabled";
+const TEMPERAMENT_FALLBACKS: Partial<Record<CharacterId, string>> = {
+  yan: "逗我可以，替我决定怎么回应就免了。你把真正想说的那句说出来，我会认真接。",
+  chi: "等一下，我喜欢你来找我，不代表我只会点头。你刚才那句我有点不爽，但我还在听。",
+};
 
 const SLEEP_PROGRAMS: Record<
   SleepMode,
@@ -551,9 +562,21 @@ export default function Home() {
   const [voiceSeconds, setVoiceSeconds] = useState(0);
   const [voiceCancelIntent, setVoiceCancelIntent] = useState(false);
   const [voiceCaptureNotice, setVoiceCaptureNotice] = useState("");
+  const [voiceTapMode, setVoiceTapMode] = useState(false);
   const [replyLoading, setReplyLoading] = useState(false);
   const [showBoundary, setShowBoundary] = useState(false);
+  const [adultConfirmed, setAdultConfirmed] = useState(false);
+  const [intimacyEnabled, setIntimacyEnabled] = useState(false);
+  const [adultGateOpen, setAdultGateOpen] = useState(false);
+  const [adultGateIntent, setAdultGateIntent] =
+    useState<AdultGateIntent>("intimacy");
+  const [pendingImage, setPendingImage] = useState<{
+    url: string;
+    name: string;
+  } | null>(null);
+  const [imageNotice, setImageNotice] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const ttsAudioCacheRef = useRef<Map<string, Blob>>(new Map());
@@ -566,12 +589,14 @@ export default function Home() {
   const voiceTranscriptRef = useRef("");
   const voiceAudioUrlRef = useRef<string | null>(null);
   const voiceMessageUrlsRef = useRef<Set<string>>(new Set());
+  const imageMessageUrlsRef = useRef<Set<string>>(new Set());
   const voiceRecordingStartedAtRef = useRef(0);
   const voiceTimerRef = useRef<number | null>(null);
   const voiceNoticeTimerRef = useRef<number | null>(null);
   const voicePressActiveRef = useRef(false);
   const voiceSessionActiveRef = useRef(false);
   const voiceCancelIntentRef = useRef(false);
+  const voiceCaptureCancelledRef = useRef(false);
   const recorderFinishedRef = useRef(false);
   const recognitionFinishedRef = useRef(false);
   const voiceCaptureErrorRef = useRef("");
@@ -605,6 +630,12 @@ export default function Home() {
       const savedCharacter = window.localStorage.getItem(
         "night-voyage-character",
       ) as CharacterId | null;
+      setAdultConfirmed(
+        window.localStorage.getItem(ADULT_CONFIRMATION_KEY) === "yes",
+      );
+      setIntimacyEnabled(
+        window.localStorage.getItem(INTIMACY_ENABLED_KEY) === "yes",
+      );
       if (savedMemories) {
         try {
           setMemories(JSON.parse(savedMemories));
@@ -665,6 +696,7 @@ export default function Home() {
 
   useEffect(() => {
     const voiceUrls = voiceMessageUrlsRef.current;
+    const imageUrls = imageMessageUrlsRef.current;
     return () => {
       if (voiceTimerRef.current !== null) {
         window.clearInterval(voiceTimerRef.current);
@@ -675,6 +707,7 @@ export default function Home() {
       speechRecognitionRef.current?.abort();
       mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
       voiceUrls.forEach((url) => URL.revokeObjectURL(url));
+      imageUrls.forEach((url) => URL.revokeObjectURL(url));
     };
   }, []);
 
@@ -725,6 +758,15 @@ export default function Home() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [sleepOpen]);
+
+  useEffect(() => {
+    if (!adultGateOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAdultGateOpen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [adultGateOpen]);
 
   const clock = useMemo(() => {
     const minutes = Math.floor(secondsLeft / 60)
@@ -880,7 +922,9 @@ export default function Home() {
     mediaRecorderRef.current = null;
     releaseVoiceInputStream();
     voiceSessionActiveRef.current = false;
+    voiceCaptureCancelledRef.current = false;
     pendingVoiceMessageRef.current = null;
+    setVoiceTapMode(false);
     setVoiceCaptureNotice(message);
     setVoiceCaptureState("error");
     if (voiceNoticeTimerRef.current !== null) {
@@ -890,7 +934,7 @@ export default function Home() {
       setVoiceCaptureState("idle");
       setVoiceCaptureNotice("");
       voiceNoticeTimerRef.current = null;
-    }, 3200);
+    }, 6000);
   }
 
   function tryFinalizeVoiceMessage() {
@@ -936,6 +980,7 @@ export default function Home() {
     ]);
     setVoiceCaptureState("idle");
     setVoiceCaptureNotice("");
+    setVoiceTapMode(false);
     void respondToMessage(
       pending.profileId,
       transcript,
@@ -946,6 +991,7 @@ export default function Home() {
   function cancelVoiceCapture() {
     voicePressActiveRef.current = false;
     voiceSessionActiveRef.current = false;
+    voiceCaptureCancelledRef.current = true;
     pendingVoiceMessageRef.current = null;
     stopVoiceTimer();
     speechRecognitionRef.current?.abort();
@@ -961,6 +1007,7 @@ export default function Home() {
     setVoiceCancelIntent(false);
     voiceCancelIntentRef.current = false;
     setVoiceSeconds(0);
+    setVoiceTapMode(false);
     setVoiceCaptureNotice("已取消");
     setVoiceCaptureState("idle");
   }
@@ -987,7 +1034,9 @@ export default function Home() {
       typeof MediaRecorder === "undefined" ||
       !Recognition
     ) {
-      showVoiceCaptureError("当前浏览器暂不支持按住说话，请使用最新版 Chrome");
+      showVoiceCaptureError(
+        "当前浏览器不支持语音转文字，请用 Chrome 或 Safari 打开本站",
+      );
       return;
     }
 
@@ -998,6 +1047,7 @@ export default function Home() {
     voiceChunksRef.current = [];
     voiceAudioUrlRef.current = null;
     voiceCaptureErrorRef.current = "";
+    voiceCaptureCancelledRef.current = false;
     recorderFinishedRef.current = false;
     recognitionFinishedRef.current = false;
     pendingVoiceMessageRef.current = null;
@@ -1011,19 +1061,21 @@ export default function Home() {
         },
       });
 
-      if (!voicePressActiveRef.current) {
+      if (voiceCaptureCancelledRef.current) {
         stream.getTracks().forEach((track) => track.stop());
         setVoiceCaptureState("idle");
         setVoiceCaptureNotice("");
         return;
       }
 
+      const startsInTapMode = !voicePressActiveRef.current;
       const recorder = new MediaRecorder(stream);
       const recognition = new Recognition();
       mediaStreamRef.current = stream;
       mediaRecorderRef.current = recorder;
       speechRecognitionRef.current = recognition;
       voiceSessionActiveRef.current = true;
+      setVoiceTapMode(startsInTapMode);
 
       recorder.ondataavailable = (event) => {
         if (event.data.size) voiceChunksRef.current.push(event.data);
@@ -1074,7 +1126,11 @@ export default function Home() {
       recognition.start();
       voiceRecordingStartedAtRef.current = Date.now();
       setVoiceCaptureState("recording");
-      setVoiceCaptureNotice("松开发送，上滑取消");
+      setVoiceCaptureNotice(
+        startsInTapMode
+          ? "正在录音，再点一下发送"
+          : "松开发送，上滑取消",
+      );
       voiceTimerRef.current = window.setInterval(() => {
         const elapsed = Math.min(
           60,
@@ -1092,11 +1148,11 @@ export default function Home() {
   function finishVoiceCapture(cancelled: boolean) {
     voicePressActiveRef.current = false;
     stopVoiceTimer();
+    if (cancelled) voiceCaptureCancelledRef.current = true;
 
     if (!voiceSessionActiveRef.current) {
       if (voiceCaptureState === "requesting") {
-        setVoiceCaptureState("idle");
-        setVoiceCaptureNotice("");
+        setVoiceCaptureNotice("授权后会自动开始录音，再点一下即可发送");
       }
       return;
     }
@@ -1104,6 +1160,7 @@ export default function Home() {
       cancelVoiceCapture();
       return;
     }
+    setVoiceTapMode(false);
 
     const duration = Math.max(
       1,
@@ -1161,11 +1218,77 @@ export default function Home() {
     }));
   }
 
+  function clearPendingImage() {
+    setPendingImage((current) => {
+      if (current) URL.revokeObjectURL(current.url);
+      return null;
+    });
+    if (photoInputRef.current) photoInputRef.current.value = "";
+  }
+
+  function openPhotoPicker() {
+    setImageNotice("");
+    if (INTIMATE_CHARACTER_IDS.has(selectedId) && !adultConfirmed) {
+      setAdultGateIntent("photo");
+      setAdultGateOpen(true);
+      return;
+    }
+    photoInputRef.current?.click();
+  }
+
+  function setIntimacyMode(enabled: boolean) {
+    window.localStorage.setItem(INTIMACY_ENABLED_KEY, enabled ? "yes" : "no");
+    setIntimacyEnabled(enabled);
+  }
+
+  function toggleIntimacyMode() {
+    if (!adultConfirmed) {
+      setAdultGateIntent("intimacy");
+      setAdultGateOpen(true);
+      return;
+    }
+    setIntimacyMode(!intimacyEnabled);
+  }
+
+  function confirmAdultAccess() {
+    window.localStorage.setItem(ADULT_CONFIRMATION_KEY, "yes");
+    setAdultConfirmed(true);
+    setIntimacyMode(true);
+    setAdultGateOpen(false);
+    if (adultGateIntent === "photo") {
+      window.setTimeout(() => photoInputRef.current?.click(), 0);
+    }
+  }
+
+  function handlePhotoSelected(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setImageNotice("请选择 JPG、PNG 或 WebP 图片");
+      event.target.value = "";
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setImageNotice("图片请控制在 8MB 以内");
+      event.target.value = "";
+      return;
+    }
+    setPendingImage((current) => {
+      if (current) URL.revokeObjectURL(current.url);
+      return { url: URL.createObjectURL(file), name: file.name };
+    });
+    setImageNotice(
+      "照片只在本机预览；当前模型只根据你随照片写的文字回应。",
+    );
+  }
+
   function selectCharacter(nextId: CharacterId) {
     stopVoice();
     chatRequestRef.current?.abort();
     chatRequestRef.current = null;
     setReplyLoading(false);
+    clearPendingImage();
+    setImageNotice("");
     setSelectedId(nextId);
     setSleepLine(0);
     setShowBoundary(false);
@@ -1203,7 +1326,17 @@ export default function Home() {
       return "我有点担心你现在的安全。先别一个人待着，也把可能伤到自己的东西放远。马上联系你信任的人，请对方现在来陪你；如果危险就在眼前，请立刻联系当地急救或报警。这个情况不能只靠线上聊天，但我会陪你把求助消息发出去。";
     }
     let candidates = profile.fallbackReplies;
-    if (/(睡不着|失眠|睡觉|晚安)/.test(text)) {
+    if (
+      TEMPERAMENT_FALLBACKS[profile.id] &&
+      /(听话|乖一点|不许反驳|你不如|换个人|玩具|机器人|别废话|闭嘴)/.test(
+        text,
+      )
+    ) {
+      candidates = [
+        TEMPERAMENT_FALLBACKS[profile.id] as string,
+        ...profile.fallbackReplies,
+      ];
+    } else if (/(睡不着|失眠|睡觉|晚安)/.test(text)) {
       candidates = [
         `困了吗？那就别硬撑了。要不要现在开一段哄睡？`,
         ...profile.fallbackReplies,
@@ -1227,6 +1360,7 @@ export default function Home() {
     profileId: CharacterId,
     text: string,
     conversation: Message[],
+    imageAttached = false,
   ) {
     const profile = CHARACTERS[profileId];
     const highRisk =
@@ -1264,6 +1398,9 @@ export default function Home() {
         body: JSON.stringify({
           characterId: profileId,
           message: text,
+          imageAttached,
+          adultConfirmed,
+          intimacyEnabled,
           history: conversation
             .filter((item) => item.role !== "system")
             .slice(-10)
@@ -1313,21 +1450,32 @@ export default function Home() {
 
   function sendMessage(event: FormEvent) {
     event.preventDefault();
-    const text = input.trim();
+    const attachedImage = pendingImage;
+    const text =
+      input.trim() ||
+      (attachedImage ? "发给你看一张照片。你觉得怎么样？" : "");
     if (!text || replyLoading) return;
     const profileId = selectedId;
     const history = messages;
+    if (attachedImage) {
+      imageMessageUrlsRef.current.add(attachedImage.url);
+    }
     appendMessagesFor(profileId, [
       {
         id: Date.now(),
         role: "user",
-        kind: "text",
+        kind: attachedImage ? "image" : "text",
         text,
+        imageUrl: attachedImage?.url,
+        imageName: attachedImage?.name,
         time: nowTime(),
       },
     ]);
     setInput("");
-    void respondToMessage(profileId, text, history);
+    setPendingImage(null);
+    setImageNotice("");
+    if (photoInputRef.current) photoInputRef.current.value = "";
+    void respondToMessage(profileId, text, history, Boolean(attachedImage));
   }
 
   function addMemory(event: FormEvent) {
@@ -1518,8 +1666,25 @@ export default function Home() {
                 </div>
                 <div>
                   <strong>{character.name}</strong>
-                  <small>想说什么都可以</small>
+                  <small>
+                    {INTIMATE_CHARACTER_IDS.has(selectedId) &&
+                    intimacyEnabled
+                      ? "成年暧昧 · 边界随你"
+                      : "想说什么都可以"}
+                  </small>
                 </div>
+                {INTIMATE_CHARACTER_IDS.has(selectedId) && (
+                  <button
+                    className={`intimacy-toggle${
+                      intimacyEnabled ? " active" : ""
+                    }`}
+                    type="button"
+                    aria-pressed={intimacyEnabled}
+                    onClick={toggleIntimacyMode}
+                  >
+                    {intimacyEnabled ? "暧昧开" : "暧昧+"}
+                  </button>
+                )}
                 <button type="button" onClick={startSleep}>
                   哄睡
                 </button>
@@ -1572,6 +1737,14 @@ export default function Home() {
                               {message.text}
                             </span>
                           </>
+                        ) : message.kind === "image" && message.imageUrl ? (
+                          <div className="image-message-card">
+                            <img
+                              src={message.imageUrl}
+                              alt={message.imageName || "玩家发送的照片"}
+                            />
+                            <p>{message.text}</p>
+                          </div>
                         ) : (
                           <p>{message.text}</p>
                         )}
@@ -1601,6 +1774,26 @@ export default function Home() {
                 )}
                 <div ref={endRef} />
               </div>
+              {(pendingImage || imageNotice) && (
+                <div className="pending-image-strip" aria-live="polite">
+                  {pendingImage && (
+                    <img src={pendingImage.url} alt="待发送照片预览" />
+                  )}
+                  <span>
+                    <strong>{pendingImage ? "照片已准备好" : "照片提示"}</strong>
+                    <small>{imageNotice}</small>
+                  </span>
+                  {pendingImage && (
+                    <button
+                      type="button"
+                      onClick={clearPendingImage}
+                      aria-label="移除待发送照片"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              )}
               <form
                 className={`composer voice-${voiceCaptureState}${
                   voiceCancelIntent ? " cancel-intent" : ""
@@ -1613,7 +1806,9 @@ export default function Home() {
                   disabled={replyLoading || voiceCaptureState === "processing"}
                   aria-label={
                     voiceCaptureState === "recording"
-                      ? "松开发送语音"
+                      ? voiceTapMode
+                        ? "点按发送语音"
+                        : "松开发送语音"
                       : "按住说话"
                   }
                   onContextMenu={(event) => event.preventDefault()}
@@ -1665,6 +1860,27 @@ export default function Home() {
                 >
                   <span className="mic-glyph" aria-hidden="true" />
                 </button>
+                <input
+                  ref={photoInputRef}
+                  className="sr-only"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handlePhotoSelected}
+                  tabIndex={-1}
+                  aria-hidden="true"
+                />
+                <button
+                  className="image-attach-button"
+                  type="button"
+                  onClick={openPhotoPicker}
+                  disabled={
+                    replyLoading || voiceCaptureState !== "idle"
+                  }
+                  aria-label="发送照片"
+                  title="发送照片"
+                >
+                  <span aria-hidden="true" />
+                </button>
                 <label className="sr-only" htmlFor="chat-input">
                   给{character.name}发消息
                 </label>
@@ -1701,7 +1917,7 @@ export default function Home() {
                   className="send-message-button"
                   type="submit"
                   disabled={
-                    !input.trim() ||
+                    (!input.trim() && !pendingImage) ||
                     replyLoading ||
                     voiceCaptureState !== "idle"
                   }
@@ -1998,6 +2214,36 @@ export default function Home() {
               </p>
             </>
           )}
+        </section>
+      )}
+      {adultGateOpen && (
+        <section
+          className={`adult-gate visual-${visualStyle}`}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="adult-gate-title"
+          style={characterStyle}
+        >
+          <div className="adult-gate-card">
+            <span>18+ · 亲密语气</span>
+            <h2 id="adult-gate-title">确认你已满 18 岁</h2>
+            <p>
+              谢临渊和迟曜可以进入更有张力的暧昧聊天：会试探、顶嘴，也会尊重你说停。内容不会进入露骨描写。
+            </p>
+            <small>
+              照片只在本机显示，当前模型不会读取图片细节，只会根据你随照片写下的话回应。
+            </small>
+            <div>
+              <button type="button" onClick={confirmAdultAccess}>
+                {adultGateIntent === "photo"
+                  ? "我已满 18 岁，继续选照片"
+                  : "我已满 18 岁，开启"}
+              </button>
+              <button type="button" onClick={() => setAdultGateOpen(false)}>
+                先不开
+              </button>
+            </div>
+          </div>
         </section>
       )}
     </main>
