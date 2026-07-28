@@ -1438,67 +1438,73 @@ export default function Home() {
                 </div>
               </div>
 
-              <section className="character-selector">
-                <div className="section-heading compact">
-                  <div>
-                    <span>换个人聊聊</span>
-                    <h2>今晚想和谁待一会儿？</h2>
+              <div className="tonight-panel">
+                <section className="character-selector">
+                  <div className="section-heading compact">
+                    <div>
+                      <span>换个人聊聊</span>
+                      <h2>今晚想和谁待一会儿？</h2>
+                    </div>
+                    <span className="private-tag">随时可以换</span>
                   </div>
-                  <span className="private-tag">随时可以换</span>
-                </div>
-                <div className="character-grid">
-                  {CHARACTER_IDS.map((id) => {
-                    const item = CHARACTERS[id];
-                    return (
-                      <button
-                        type="button"
-                        key={id}
-                        className={id === selectedId ? "active" : ""}
-                        onClick={() => selectCharacter(id)}
-                        aria-pressed={id === selectedId}
-                      >
-                        <span className="character-thumb">
-                          <img
-                            src={
-                              visualStyle === "real"
-                                ? item.realImage
-                                : item.image
-                            }
-                            alt=""
-                          />
-                        </span>
-                        <strong>{item.name}</strong>
-                        <small>{item.archetype}</small>
-                      </button>
-                    );
-                  })}
-                </div>
-              </section>
+                  <div className="character-grid">
+                    {CHARACTER_IDS.map((id) => {
+                      const item = CHARACTERS[id];
+                      return (
+                        <button
+                          type="button"
+                          key={id}
+                          className={id === selectedId ? "active" : ""}
+                          onClick={() => selectCharacter(id)}
+                          aria-pressed={id === selectedId}
+                        >
+                          <span className="character-thumb">
+                            <img
+                              src={
+                                visualStyle === "real"
+                                  ? item.realImage
+                                  : item.image
+                              }
+                              alt=""
+                            />
+                          </span>
+                          <strong>{item.name}</strong>
+                          <small>{item.archetype}</small>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
 
-              <button
-                className="conversation-entry"
-                type="button"
-                onClick={openChat}
-              >
-                <span>
-                  <small>不用先想该怎么说</small>
-                  <strong>找{character.name}聊聊</strong>
-                  <span>他会跟着你现在的状态回应。</span>
-                </span>
-                <b>开始</b>
-              </button>
+                <button
+                  className="conversation-entry"
+                  type="button"
+                  onClick={openChat}
+                >
+                  <span>
+                    <small>不用先想该怎么说</small>
+                    <strong>找{character.name}聊聊</strong>
+                    <span>他会跟着你现在的状态回应。</span>
+                  </span>
+                  <b>开始</b>
+                </button>
 
-              <button className="sleep-entry" type="button" onClick={startSleep}>
-                <span className="moon-orbit">
-                  <span className="moon-core">月</span>
-                </span>
-                <span className="sleep-entry-copy">
-                  <small>熄屏也能听</small>
-                  <strong>让{character.name}陪你睡一会儿</strong>
-                  <span>12 分钟 · {character.sleepScene}</span>
-                </span>
-                <span className="entry-arrow">进入</span>
-              </button>
+                <button
+                  className="sleep-entry"
+                  type="button"
+                  onClick={startSleep}
+                >
+                  <span className="moon-orbit">
+                    <span className="moon-core">月</span>
+                  </span>
+                  <span className="sleep-entry-copy">
+                    <small>熄屏也能听</small>
+                    <strong>让{character.name}陪你睡一会儿</strong>
+                    <span>12 分钟 · {character.sleepScene}</span>
+                  </span>
+                  <span className="entry-arrow">进入</span>
+                </button>
+              </div>
 
             </section>
           )}
@@ -1762,109 +1768,113 @@ export default function Home() {
 
           {tab === "profile" && (
             <section className="profile-view">
-              <div className="profile-portrait">
-                <img src={characterImage} alt={character.name} />
+              <div className="profile-identity">
+                <div className="profile-portrait">
+                  <img src={characterImage} alt={character.name} />
+                </div>
+                <span className="status-pill">
+                  {character.archetype} · 仅在线陪伴
+                </span>
+                <h1>{character.name}</h1>
+                <p className="profile-role">
+                  {character.role} · {character.age}岁
+                </p>
+                <blockquote>“{character.profileQuote}”</blockquote>
               </div>
-              <span className="status-pill">
-                {character.archetype} · 仅在线陪伴
-              </span>
-              <h1>{character.name}</h1>
-              <p className="profile-role">
-                {character.role} · {character.age}岁
-              </p>
-              <blockquote>“{character.profileQuote}”</blockquote>
-              <div className="profile-cast">
-                {CHARACTER_IDS.map((id) => (
+              <div className="profile-details">
+                <div className="profile-cast">
+                  {CHARACTER_IDS.map((id) => (
+                    <button
+                      type="button"
+                      key={id}
+                      className={id === selectedId ? "active" : ""}
+                      onClick={() => selectCharacter(id)}
+                    >
+                      <img
+                        src={
+                          visualStyle === "real"
+                            ? CHARACTERS[id].realImage
+                            : CHARACTERS[id].image
+                        }
+                        alt=""
+                      />
+                      <span>{CHARACTERS[id].name}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="profile-settings">
+                  <div className="visual-style-setting">
+                    <span>
+                      <strong>视觉风格</strong>
+                      <small>8 位角色与界面会一起切换</small>
+                    </span>
+                    <div
+                      className="visual-style-segment"
+                      role="group"
+                      aria-label="选择视觉风格"
+                    >
+                      <button
+                        type="button"
+                        className={visualStyle === "manhwa" ? "active" : ""}
+                        aria-pressed={visualStyle === "manhwa"}
+                        onClick={() => changeVisualStyle("manhwa")}
+                      >
+                        韩漫
+                      </button>
+                      <button
+                        type="button"
+                        className={visualStyle === "real" ? "active" : ""}
+                        aria-pressed={visualStyle === "real"}
+                        onClick={() => changeVisualStyle("real")}
+                      >
+                        仿真人
+                      </button>
+                    </div>
+                  </div>
+                  <label>
+                    <span>
+                      <strong>语音回复</strong>
+                      <small>{character.archetype}</small>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={voiceOn}
+                      onChange={(event) =>
+                        setVoiceEnabled(event.target.checked)
+                      }
+                    />
+                  </label>
                   <button
                     type="button"
-                    key={id}
-                    className={id === selectedId ? "active" : ""}
-                    onClick={() => selectCharacter(id)}
+                    onClick={() => speak(character.voicePreview)}
+                    disabled={voiceLoading}
                   >
-                    <img
-                      src={
-                        visualStyle === "real"
-                          ? CHARACTERS[id].realImage
-                          : CHARACTERS[id].image
-                      }
-                      alt=""
-                    />
-                    <span>{CHARACTERS[id].name}</span>
+                    <span>
+                      <strong>听听{character.name}的声音</strong>
+                      <small>
+                        {voiceProvider === "natural"
+                          ? "当前声线已连接"
+                          : voiceProvider === "device"
+                            ? "正在使用设备声音"
+                            : "播放时会自动连接"}
+                      </small>
+                    </span>
+                    <b>{voiceLoading ? "生成中" : "播放"}</b>
                   </button>
-                ))}
-              </div>
-              <div className="profile-settings">
-                <div className="visual-style-setting">
-                  <span>
-                    <strong>视觉风格</strong>
-                    <small>8 位角色与界面会一起切换</small>
-                  </span>
-                  <div
-                    className="visual-style-segment"
-                    role="group"
-                    aria-label="选择视觉风格"
-                  >
-                    <button
-                      type="button"
-                      className={visualStyle === "manhwa" ? "active" : ""}
-                      aria-pressed={visualStyle === "manhwa"}
-                      onClick={() => changeVisualStyle("manhwa")}
-                    >
-                      韩漫
-                    </button>
-                    <button
-                      type="button"
-                      className={visualStyle === "real" ? "active" : ""}
-                      aria-pressed={visualStyle === "real"}
-                      onClick={() => changeVisualStyle("real")}
-                    >
-                      仿真人
-                    </button>
-                  </div>
+                  <button type="button" onClick={() => setTab("memory")}>
+                    <span>
+                      <strong>管理记住的小事</strong>
+                      <small>{memories.length} 条，仅保存在本机</small>
+                    </span>
+                    <b>查看</b>
+                  </button>
                 </div>
-                <label>
-                  <span>
-                    <strong>语音回复</strong>
-                    <small>{character.archetype}</small>
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={voiceOn}
-                    onChange={(event) =>
-                      setVoiceEnabled(event.target.checked)
-                    }
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={() => speak(character.voicePreview)}
-                  disabled={voiceLoading}
-                >
-                  <span>
-                    <strong>听听{character.name}的声音</strong>
-                    <small>
-                      {voiceProvider === "natural"
-                        ? "当前声线已连接"
-                        : voiceProvider === "device"
-                          ? "正在使用设备声音"
-                          : "播放时会自动连接"}
-                    </small>
-                  </span>
-                  <b>{voiceLoading ? "生成中" : "播放"}</b>
-                </button>
-                <button type="button" onClick={() => setTab("memory")}>
-                  <span>
-                    <strong>管理记住的小事</strong>
-                    <small>{memories.length} 条，仅保存在本机</small>
-                  </span>
-                  <b>查看</b>
-                </button>
-              </div>
-              <div className="ai-boundary">
-                <strong>使用说明</strong>
-                <p>
-                  他们可以陪你聊天、放松和入睡，但不是真实的人，也不能替代医生、心理咨询师或你身边的人。
-                </p>
+                <div className="ai-boundary">
+                  <strong>使用说明</strong>
+                  <p>
+                    他们可以陪你聊天、放松和入睡，但不是真实的人，也不能替代医生、心理咨询师或你身边的人。
+                  </p>
+                </div>
               </div>
             </section>
           )}
