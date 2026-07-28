@@ -1941,6 +1941,16 @@ input:focus-visible {
   color: var(--text-secondary);
 }
 
+.online-dot.asleep::before {
+  background: #7e8793;
+  box-shadow: 0 0 8px rgba(126, 135, 147, 0.45);
+}
+
+.online-dot.unavailable::before {
+  background: var(--character-accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--character-accent) 60%, transparent);
+}
+
 .icon-button {
   border-color: var(--border-strong);
   background: var(--surface-primary);

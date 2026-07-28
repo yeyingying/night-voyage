@@ -10,6 +10,10 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import {
+  getCharacterWorldSnapshot,
+  nextReachableTime,
+} from "@/lib/character-clock";
 import { DEVELOPER_VOICE_STORAGE_KEY } from "@/lib/voice-config";
 import { recordTtsUsage } from "@/lib/tts-usage";
 
@@ -38,6 +42,7 @@ type Message = {
   role: "companion" | "user" | "system";
   text: string;
   time: string;
+  sentAt?: number;
   kind?: "text" | "voice" | "image" | "proactive";
   audioUrl?: string;
   imageUrl?: string;
@@ -437,56 +442,6 @@ type ProactiveState = {
   sentToday: number;
   lastMessageIndex: number;
 };
-const PROACTIVE_MOMENTS: Record<CharacterId, string[]> = {
-  pei: [
-    "刚从档案室出来，才发现外面的雨已经停了。你安静挺久了——不是催你，我只是来确认你没把自己忙丢。",
-    "倒水的时候顺手拿了两只杯子。习惯真麻烦。你再不出现，另一杯就要凉了。",
-    "刚整理完一段很长的旧记忆，脑子有点吵。忽然想听你说两句。今天过得还好吗？",
-    "路过楼下那家店，看见你上次提过的甜点。我没买——先问问你，今天有没有好好吃饭。",
-  ],
-  chi: [
-    "刚下训练课，跑道尽头的晚霞特别好看。我第一反应居然是想拍给你。你忙完了吗？",
-    "今天落地比平时稳，教员难得没挑刺。我本来想第一个告诉你，结果某人一直没出现。",
-    "路过篮球场被抓去凑人数，赢了。现在允许你夸我一句，过时不候。",
-    "食堂今天居然有你会喜欢的菜。我排队的时候给你留了位置——虽然你大概率赶不过来。",
-  ],
-  yan: [
-    "刚结束一场拍卖，满场都是抢着说话的人。安静下来以后，反倒想听听你今天说了什么。",
-    "有人送来一件自以为很特别的藏品。我看了两眼，猜你会吐槽得比我更准。人呢？",
-    "咖啡已经凉了，你也安静得有点久。放心，我不查行程。回来时告诉我今天过得怎么样就行。",
-    "刚才有人问我在等谁。我说没有。现在想想，这个答案似乎不太准确。",
-  ],
-  lu: [
-    "刚修好一段雨声，里面藏着很轻的风铃。戴耳机听的时候，莫名觉得你会喜欢。",
-    "工作室忽然安静下来，我才发现你很久没说话了。不用急着回，我只是想来陪你安静一会儿。",
-    "录到一段夜班电车经过的声音，很像一座城市在慢慢呼吸。你那边现在是什么声音？",
-    "今天删掉了很多不必要的杂音，却觉得少了你说话的声音，房间反而太空了。",
-  ],
-  cheng: [
-    "刚送走最后一位客人，店里只剩翻书声。给你留了靠窗的位置，什么时候回来坐坐？",
-    "有人把一张写着“别太辛苦”的书签夹在书里。我看到的时候，第一反应是该转送给你。",
-    "烤箱里的小饼干刚好出炉。我替你尝了一块——还行，剩下的可以考虑给你留。",
-    "今天来了一只躲雨的猫，占了你常坐的位置。它走了，位置还是给你留着。",
-  ],
-  qi: [
-    "刚结束一趟夜航，落地平安。现在轮到你报个平安——忙完了就回一句，不急。",
-    "队里刚开完复盘会。所有人都记得带装备，只有某个人可能又忘了按时吃饭。",
-    "路上风很大，我回来第一件事是看你有没有消息。没有。行，我亲自来问：今天还好吗？",
-    "刚把最后一项检查做完。你那边如果也累了，就别再硬撑着证明自己能行。",
-  ],
-  shen: [
-    "一组实验刚跑完，我终于能离开屏幕。顺便提醒你也眨眨眼、活动一下肩膀——这是建议，不是命令。",
-    "今天的数据比预期漂亮，本来想理性地高兴一下。想了想，还是更想直接告诉你。",
-    "刚泡的茶温度正好。你的消息间隔已经超出平时范围，但我暂时不做负面推断。只是来问问你。",
-    "研究室的人都走了，只剩仪器还亮着。我准备下班。你呢，今天打算几点放过自己？",
-  ],
-  xu: [
-    "刚把穹顶调成今晚的星图，发现一颗特别亮的。讲解词还没想好，先把第一眼留给你。",
-    "今天有个小朋友问，想念一个人时该看哪颗星。我差点把你的名字说出来。是不是很没出息？",
-    "闭馆了，我还坐在最后一排。旁边空着的位置有点显眼，所以来问问你什么时候出现。",
-    "刚学会一个很冷的星座笑话。你再不回来，我就只能讲给保安听了。他应该不会笑。",
-  ],
-};
 const TEMPERAMENT_FALLBACKS: Partial<Record<CharacterId, string>> = {
   yan: "逗我可以，替我决定怎么回应就免了。你把真正想说的那句说出来，我会认真接。",
   chi: "等一下，我喜欢你来找我，不代表我只会点头。你刚才那句我有点不爽，但我还在听。",
@@ -684,6 +639,7 @@ export default function Home() {
     useState<AdultGateIntent>("intimacy");
   const [proactiveEnabled, setProactiveEnabled] = useState(true);
   const [localStateHydrated, setLocalStateHydrated] = useState(false);
+  const [clockNow, setClockNow] = useState(0);
   const [pendingImage, setPendingImage] = useState<{
     url: string;
     name: string;
@@ -727,6 +683,14 @@ export default function Home() {
   });
 
   const character = CHARACTERS[selectedId];
+  const worldSnapshot = useMemo(
+    () =>
+      getCharacterWorldSnapshot(
+        selectedId,
+        new Date(clockNow || 0),
+      ),
+    [clockNow, selectedId],
+  );
   const characterImage =
     visualStyle === "real" ? character.realImage : character.image;
   const messages = messagesByCharacter[selectedId];
@@ -828,6 +792,15 @@ export default function Home() {
       setLocalStateHydrated(true);
     }, 0);
     return () => window.clearTimeout(hydrateLocalState);
+  }, []);
+
+  useEffect(() => {
+    const initialTick = window.setTimeout(() => setClockNow(Date.now()), 0);
+    const timer = window.setInterval(() => setClockNow(Date.now()), 60 * 1000);
+    return () => {
+      window.clearTimeout(initialTick);
+      window.clearInterval(timer);
+    };
   }, []);
 
   useEffect(() => {
@@ -960,7 +933,25 @@ export default function Home() {
       }
 
       const profile = CHARACTERS[current.characterId];
-      const moments = PROACTIVE_MOMENTS[current.characterId];
+      const liveSnapshot = getCharacterWorldSnapshot(
+        current.characterId,
+        new Date(now),
+      );
+      if (
+        liveSnapshot.availability === "asleep" ||
+        liveSnapshot.availability === "unavailable"
+      ) {
+        persistProactiveState({
+          ...current,
+          nextAt: nextProactiveTime(
+            nextReachableTime(current.characterId, new Date(now)),
+            [5, 20],
+          ),
+        });
+        return;
+      }
+      const moments = liveSnapshot.checkIns;
+      if (!moments.length) return;
       const offset =
         moments.length > 1
           ? 1 + Math.floor(Math.random() * (moments.length - 1))
@@ -980,6 +971,7 @@ export default function Home() {
             kind: "proactive",
             text,
             time: nowTime(),
+            sentAt: now,
           },
         ],
       }));
@@ -1288,6 +1280,7 @@ export default function Home() {
         audioUrl: audioUrl ?? undefined,
         duration: pending.duration,
         time: nowTime(),
+        sentAt: Date.now(),
       },
     ]);
     markPlayerActivity(pending.profileId);
@@ -1736,6 +1729,7 @@ export default function Home() {
           role: "companion",
           text: reply,
           time: nowTime(),
+          sentAt: Date.now(),
         },
       ]);
       speak(reply);
@@ -1749,6 +1743,9 @@ export default function Home() {
 
     let reply: string;
     try {
+      const requestNow = Date.now();
+      const requestDate = new Date(requestNow);
+      const requestWorld = getCharacterWorldSnapshot(profileId, requestDate);
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1758,12 +1755,38 @@ export default function Home() {
           imageAttached,
           adultConfirmed,
           intimacyEnabled,
+          worldContext: {
+            now: requestNow,
+            localDateTime: new Intl.DateTimeFormat("zh-CN", {
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+              weekday: "short",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            }).format(requestDate),
+            timeZone:
+              Intl.DateTimeFormat().resolvedOptions().timeZone || "local",
+            activity: requestWorld.activity,
+            scene: requestWorld.scene,
+            availability: requestWorld.availability,
+            activityWindow: `${requestWorld.startLabel}–${requestWorld.endLabel}`,
+            activityStartedAt: requestWorld.startedAt,
+            activityEndsAt: requestWorld.endsAt,
+            nextActivity: requestWorld.nextActivity,
+            nextStartsAt: requestWorld.nextStartsAt,
+          },
           history: conversation
             .filter((item) => item.role !== "system")
             .slice(-10)
             .map((item) => ({
               role: item.role === "user" ? "user" : "assistant",
               content: item.text,
+              sentAt:
+                item.sentAt ??
+                (item.id > 1_000_000_000_000 ? item.id : undefined),
+              proactive: item.kind === "proactive",
             })),
           memories: memories.slice(0, 6).map((item) => item.text),
         }),
@@ -1800,6 +1823,7 @@ export default function Home() {
         role: "companion",
         text: reply,
         time: nowTime(),
+        sentAt: Date.now(),
       },
     ]);
     speak(reply);
@@ -1826,6 +1850,7 @@ export default function Home() {
         imageUrl: attachedImage?.url,
         imageName: attachedImage?.name,
         time: nowTime(),
+        sentAt: Date.now(),
       },
     ]);
     markPlayerActivity(profileId);
@@ -1900,11 +1925,17 @@ export default function Home() {
             <span className="brand-mark">夜</span>
             <span>
               <strong>夜航恋人</strong>
-              <small>正在和{character.name}聊天</small>
+              <small>
+                {character.name} · {worldSnapshot.activity}
+              </small>
             </span>
           </button>
           <div className="top-actions">
-            <span className="online-dot">{character.name}在</span>
+            <span className={`online-dot ${worldSnapshot.availability}`}>
+              {worldSnapshot.availability === "asleep"
+                ? "休息中"
+                : worldSnapshot.activity}
+            </span>
             <button
               className="icon-button"
               type="button"
@@ -1935,10 +1966,14 @@ export default function Home() {
                 </span>
                 <div className="hero-status">
                   <span className="status-pill">{character.archetype}</span>
-                  <p>{character.age}岁 · 现在有空</p>
+                  <p>
+                    {character.age}岁 · {worldSnapshot.statusText}
+                  </p>
                 </div>
                 <div className="hero-copy">
-                  <p className="eyebrow">{character.name}在等你</p>
+                  <p className="eyebrow">
+                    {worldSnapshot.scene} · 至 {worldSnapshot.endLabel}
+                  </p>
                   <h1>{character.heroTitle}</h1>
                   <p>{character.heroSubline}</p>
                 </div>
@@ -2024,12 +2059,7 @@ export default function Home() {
                 </div>
                 <div>
                   <strong>{character.name}</strong>
-                  <small>
-                    {INTIMATE_CHARACTER_IDS.has(selectedId) &&
-                    intimacyEnabled
-                      ? "成年暧昧 · 边界随你"
-                      : "想说什么都可以"}
-                  </small>
+                  <small>{worldSnapshot.statusText}</small>
                 </div>
                 {INTIMATE_CHARACTER_IDS.has(selectedId) && (
                   <button

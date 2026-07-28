@@ -3,13 +3,14 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 async function productSources() {
-  const [page, layout, css, chatRoute] = await Promise.all([
+  const [page, layout, css, chatRoute, characterClock] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/api/chat/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/character-clock.ts", import.meta.url), "utf8"),
   ]);
-  return { page, layout, css, chatRoute };
+  return { page, layout, css, chatRoute, characterClock };
 }
 
 test("ships the finished game shell and both visual styles", async () => {
@@ -46,14 +47,24 @@ test("guards adult intimacy, local photo previews, and character boundaries", as
 });
 
 test("adds restrained character-led daily check-ins", async () => {
-  const { page, css } = await productSources();
+  const { page, css, chatRoute, characterClock } = await productSources();
 
   assert.match(page, /PROACTIVE_FIRST_MINUTES = \[90, 150\]/);
   assert.match(page, /PROACTIVE_FOLLOWUP_MINUTES = \[240, 360\]/);
   assert.match(page, /PROACTIVE_DAILY_LIMIT = 3/);
-  assert.match(page, /PROACTIVE_MOMENTS: Record<CharacterId, string\[\]>/);
+  assert.match(page, /getCharacterWorldSnapshot/);
+  assert.match(page, /nextReachableTime/);
   assert.match(page, /刚好想起你/);
   assert.match(page, /主动来找你/);
   assert.match(page, /CHAT_HISTORY_KEY/);
   assert.match(css, /\.proactive-message-cue/);
+
+  assert.match(characterClock, /CHARACTER_SCHEDULES/);
+  assert.match(characterClock, /weekday:/);
+  assert.match(characterClock, /weekend:/);
+  assert.match(characterClock, /availability: "unavailable"/);
+  assert.match(characterClock, /export function getCharacterWorldSnapshot/);
+  assert.match(chatRoute, /worldTimelinePrompt/);
+  assert.match(chatRoute, /旧事件推进到现在/);
+  assert.match(chatRoute, /超过事件合理时长/);
 });

@@ -19,6 +19,22 @@ type RuntimeEnv = {
 type HistoryMessage = {
   role: "user" | "assistant";
   content: string;
+  sentAt?: number;
+  proactive?: boolean;
+};
+
+type WorldContext = {
+  now: number;
+  localDateTime: string;
+  timeZone: string;
+  activity: string;
+  scene: string;
+  availability: "asleep" | "unavailable" | "busy" | "available";
+  activityWindow: string;
+  activityStartedAt: number;
+  activityEndsAt: number;
+  nextActivity: string;
+  nextStartsAt: number;
 };
 
 type MiniMaxChatResponse = {
@@ -243,8 +259,101 @@ function validHistory(value: unknown): HistoryMessage[] {
     .map((item) => ({
       role: item.role,
       content: item.content.trim().slice(0, 800),
+      sentAt:
+        Number.isFinite(item.sentAt) && Number(item.sentAt) > 0
+          ? Number(item.sentAt)
+          : undefined,
+      proactive: item.proactive === true,
     }))
     .filter((item) => item.content);
+}
+
+function validWorldContext(value: unknown): WorldContext | null {
+  if (!value || typeof value !== "object") return null;
+  const input = value as Partial<WorldContext>;
+  const availability = input.availability;
+  if (
+    !Number.isFinite(input.now) ||
+    !Number.isFinite(input.activityStartedAt) ||
+    !Number.isFinite(input.activityEndsAt) ||
+    !Number.isFinite(input.nextStartsAt) ||
+    typeof input.localDateTime !== "string" ||
+    typeof input.timeZone !== "string" ||
+    typeof input.activity !== "string" ||
+    typeof input.scene !== "string" ||
+    typeof input.activityWindow !== "string" ||
+    typeof input.nextActivity !== "string" ||
+    !["asleep", "unavailable", "busy", "available"].includes(
+      availability ?? "",
+    )
+  ) {
+    return null;
+  }
+  return {
+    now: Number(input.now),
+    localDateTime: input.localDateTime.trim().slice(0, 80),
+    timeZone: input.timeZone.trim().slice(0, 80),
+    activity: input.activity.trim().slice(0, 80),
+    scene: input.scene.trim().slice(0, 80),
+    availability: availability as WorldContext["availability"],
+    activityWindow: input.activityWindow.trim().slice(0, 30),
+    activityStartedAt: Number(input.activityStartedAt),
+    activityEndsAt: Number(input.activityEndsAt),
+    nextActivity: input.nextActivity.trim().slice(0, 80),
+    nextStartsAt: Number(input.nextStartsAt),
+  };
+}
+
+function elapsedLabel(now: number, sentAt: number) {
+  const elapsedMinutes = Math.max(0, Math.floor((now - sentAt) / 60_000));
+  if (elapsedMinutes < 1) return "刚刚";
+  if (elapsedMinutes < 60) return `${elapsedMinutes}分钟前`;
+  const hours = Math.floor(elapsedMinutes / 60);
+  const minutes = elapsedMinutes % 60;
+  if (hours < 24) {
+    return minutes ? `${hours}小时${minutes}分钟前` : `${hours}小时前`;
+  }
+  return `${Math.floor(hours / 24)}天前`;
+}
+
+function worldTimelinePrompt(
+  world: WorldContext | null,
+  history: HistoryMessage[],
+) {
+  if (!world) {
+    return `遵守真实时间连续性：旧消息里提到的短时事件不会永远停留在原地。若已经隔了明显时长，要先推断事件已经结束，不要继续声称“刚刚”“还在等”“马上就到”。`;
+  }
+  const timedHistory = history
+    .filter((item) => item.sentAt)
+    .slice(-6)
+    .map(
+      (item) =>
+        `- ${item.role === "user" ? "玩家" : "你"}在${elapsedLabel(
+          world.now,
+          item.sentAt as number,
+        )}${item.proactive ? "主动" : ""}说：“${item.content.slice(0, 140)}”`,
+    );
+  const availabilityDescription =
+    world.availability === "asleep"
+      ? "按日程正在休息。若现在回复，应像被消息短暂叫醒或稍后看见，不能表现成一直清醒等候。"
+      : world.availability === "unavailable"
+        ? "按日程处于不能看手机的时段。回复应视为当前刚获得短暂空档，不能一边持续执行任务一边长聊。"
+        : world.availability === "busy"
+          ? "正在忙，但可能在自然空档查看消息。"
+          : "目前有正常的私人空档。";
+
+  return `真实世界时间与角色日程（这是事实，优先级高于旧聊天中的场景）：
+- 玩家本地当前时间：${world.localDateTime}（${world.timeZone}）
+- 你当前在${world.scene}${world.activity}，日程时段为${world.activityWindow}。${availabilityDescription}
+- 下一项日程是“${world.nextActivity}”。
+${timedHistory.length ? `最近消息的真实间隔：\n${timedHistory.join("\n")}` : "最近没有可用的消息时间戳。"}
+
+严格保持时间连续性：
+1. 每次回复前先把旧事件推进到现在。登机、飞行、落地、等行李、通勤、吃饭、洗澡、会议、上课等短时事件经过一两小时后通常已经结束。
+2. 旧消息超过30分钟，不要再无依据地说“刚刚”；超过事件合理时长，不能说自己还在原处等候。
+3. 当前日程与旧消息冲突时，以当前日程为准，用“早就结束了”“已经到家/到下一安排了”等自然承接，不能假装时间被冻结。
+4. 不必每条都汇报行程。只有玩家问到、旧话题涉及时间，或自然提起日常时才带出当前状态。
+5. 不虚构精确航班、天气、地点、真实人物或突发事件；只使用给定的日程事实。`;
 }
 
 function validMemories(value: unknown) {
@@ -270,6 +379,7 @@ export async function POST(request: Request) {
     imageAttached?: unknown;
     adultConfirmed?: unknown;
     intimacyEnabled?: unknown;
+    worldContext?: unknown;
   };
 
   try {
@@ -312,6 +422,8 @@ export async function POST(request: Request) {
   }
 
   const history = validHistory(payload.history);
+  const worldContext = validWorldContext(payload.worldContext);
+  const timelinePrompt = worldTimelinePrompt(worldContext, history);
   const memories = validMemories(payload.memories);
   const memoryPrompt = memories.length
     ? `玩家允许保存的记忆：\n${memories.map((item) => `- ${item}`).join("\n")}`
@@ -338,6 +450,7 @@ export async function POST(request: Request) {
     imagePrompt,
     ADAPTIVE_PROMPT,
     RELATIONSHIP_PROMPT,
+    timelinePrompt,
     memoryPrompt,
     samplePrompt,
     ADAPTIVE_EXAMPLES,
@@ -377,7 +490,10 @@ export async function POST(request: Request) {
         model,
         messages: [
           { role: "system", content: prompt },
-          ...history,
+          ...history.map((item) => ({
+            role: item.role,
+            content: item.content,
+          })),
           { role: "user", content: message },
           ...revisionMessages,
         ],
