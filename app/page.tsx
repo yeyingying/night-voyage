@@ -1,0 +1,1598 @@
+"use client";
+
+import {
+  CSSProperties,
+  FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { DEVELOPER_VOICE_STORAGE_KEY } from "@/lib/voice-config";
+import { recordTtsUsage } from "@/lib/tts-usage";
+
+type Tab = "tonight" | "chat" | "memory" | "profile";
+type CharacterId = "pei" | "chi" | "yan" | "lu";
+type VoiceProvider = "auto" | "natural" | "device";
+type VoiceCaptureState =
+  | "idle"
+  | "requesting"
+  | "recording"
+  | "processing"
+  | "error";
+type Message = {
+  id: number;
+  role: "companion" | "user" | "system";
+  text: string;
+  time: string;
+  kind?: "text" | "voice";
+  audioUrl?: string;
+  duration?: number;
+};
+type Memory = {
+  id: number;
+  text: string;
+  date: string;
+};
+type CharacterProfile = {
+  id: CharacterId;
+  name: string;
+  age: number;
+  archetype: string;
+  role: string;
+  image: string;
+  accent: string;
+  accentSoft: string;
+  heroTitle: string;
+  heroSubline: string;
+  greeting: string;
+  voicePreview: string;
+  voice: { rate: number; pitch: number; index: number };
+  sleepScene: string;
+  sleepLines: string[];
+  workReply: string;
+  upsetReply: string;
+  cheerReply: string;
+  fallbackReplies: string[];
+  profileQuote: string;
+};
+
+type SpeechRecognitionAlternativeLike = {
+  transcript: string;
+};
+
+type SpeechRecognitionResultLike = {
+  isFinal: boolean;
+  length: number;
+  [index: number]: SpeechRecognitionAlternativeLike;
+};
+
+type SpeechRecognitionEventLike = Event & {
+  resultIndex: number;
+  results: {
+    length: number;
+    [index: number]: SpeechRecognitionResultLike;
+  };
+};
+
+type SpeechRecognitionErrorLike = Event & {
+  error: string;
+};
+
+type BrowserSpeechRecognition = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorLike) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+};
+
+type SpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
+
+type PendingVoiceMessage = {
+  profileId: CharacterId;
+  history: Message[];
+  duration: number;
+};
+
+const CHARACTERS: Record<CharacterId, CharacterProfile> = {
+  pei: {
+    id: "pei",
+    name: "裴叙白",
+    age: 28,
+    archetype: "成熟守护系",
+    role: "记忆重构师",
+    image: "/pei-xubai.png",
+    accent: "#d8bd82",
+    accentSoft: "rgba(216, 189, 130, 0.16)",
+    heroTitle: "累了就先歇会儿。",
+    heroSubline: "别急着把一切都想明白。",
+    greeting: "回来了？先坐会儿。想说什么就说，不想说也没关系。",
+    voicePreview: "过来坐。今天的事先放一放，我陪你待会儿。",
+    voice: { rate: 0.9, pitch: 0.88, index: 0 },
+    sleepScene: "雨夜档案馆",
+    sleepLines: [
+      "躺好了吗？今天先到这里。",
+      "没做完的事，明天再说。",
+      "眉头松一点，肩膀也别再绷着。",
+      "不用刻意数呼吸，舒服就好。",
+      "手机放旁边吧，我还在。",
+      "晚安。睡吧。",
+    ],
+    workReply:
+      "先把最急的那件挑出来，今晚只管它。做完来找我，我负责宣布你下班。",
+    upsetReply:
+      "受了委屈还得装没事，难怪撑不住。来我这儿就别表现得那么懂事了。",
+    cheerReply:
+      "今天已经够辛苦了，剩下这点时间归你休息，也归我管你别再逞强。",
+    fallbackReplies: [
+      "这事放谁身上都不好受。你不用急着讲完整，我听得懂。",
+      "先别替别人找理由。在我这里，你可以只说自己不高兴。",
+      "忙成这样还记得来找我，不错。先坐会儿，剩下的慢慢说。",
+    ],
+    profileQuote: "你说过的事，我会记得。",
+  },
+  chi: {
+    id: "chi",
+    name: "迟曜",
+    age: 22,
+    archetype: "阳光年下系",
+    role: "航空学院大四生",
+    image: "/chi-yao-campus.png",
+    accent: "#e8a65b",
+    accentSoft: "rgba(232, 166, 91, 0.17)",
+    heroTitle: "我下课了，来找你。",
+    heroSubline: "走，出去转一圈。",
+    greeting: "我刚下课。你今天怎么样？看着像是攒了一肚子话。",
+    voicePreview: "我下课了，在操场这边。你慢慢走，我等你。",
+    voice: { rate: 1.02, pitch: 0.95, index: 1 },
+    sleepScene: "云上夜航",
+    sleepLines: [
+      "被子盖好了吗？我等你躺好。",
+      "手机放旁边吧，今天先到这儿。",
+      "肩膀松一松，你又绷一天了。",
+      "呼吸慢一点，我还没走。",
+      "明天的事，明天再说。",
+      "晚安，睡吧。",
+    ],
+    workReply:
+      "先别骂自己。挑一件明天非做不可的，其他的先排队。做完回来，我给你发优秀学员奖。",
+    upsetReply:
+      "今天是真的把你欺负狠了。先不用笑，我认真陪你一会儿。",
+    cheerReply:
+      "好，坏心情先靠边站，排队也轮不到它。现在这个位置我要了。",
+    fallbackReplies: [
+      "这也太气人了。你先说，我保证今天不替对方找借口。",
+      "不用组织语言，直接从最想吐槽的地方开始。我接得住。",
+      "你一来我就看出来了，今天肯定有人惹你。胆子不小。",
+    ],
+    profileQuote: "累了就叫我，别一个人憋着。",
+  },
+  yan: {
+    id: "yan",
+    name: "谢临渊",
+    age: 30,
+    archetype: "冷傲偏爱系",
+    role: "禁梦拍卖师",
+    image: "/xie-linyuan.png",
+    accent: "#b36d63",
+    accentSoft: "rgba(179, 109, 99, 0.16)",
+    heroTitle: "又在硬撑？我看得出来。",
+    heroSubline: "坐过来，先缓一会儿。",
+    greeting: "来了。脸色不太好。坐吧，想说就说。",
+    voicePreview: "别站那么远。过来坐，我听着。",
+    voice: { rate: 0.92, pitch: 0.88, index: 2 },
+    sleepScene: "午夜观景车厢",
+    sleepLines: [
+      "门关好了，没人会来打扰。",
+      "手机放远一点，那些消息明天再回。",
+      "手松开，别再攥着被角。",
+      "车厢很安静，你可以放心睡。",
+      "明天的事，醒了再处理。",
+      "闭上眼吧。我陪你到时间结束。",
+    ],
+    workReply:
+      "别把所有人的要求都算成你的责任。先挑出真正该你管的那件，其他人自己的麻烦，让他们自己领回去。",
+    upsetReply:
+      "你已经忍得够久了。在我这里不用继续装得若无其事。",
+    cheerReply:
+      "你皱眉的样子很有气势。可惜，对我没什么威慑力。",
+    fallbackReplies: [
+      "这事没你说得那么轻。至少在我这里，不必再故作大方。",
+      "你已经替别人想得够周到了。现在轮到你偏心自己一次。",
+      "听起来，对方很擅长给别人添堵。可惜，今晚不准备让他继续得逞。",
+    ],
+    profileQuote: "不想说就不说，我不会逼你。",
+  },
+  lu: {
+    id: "lu",
+    name: "陆听澜",
+    age: 29,
+    archetype: "温柔治愈系",
+    role: "梦境声音修复师",
+    image: "/lu-tinglan.png",
+    accent: "#8fae9e",
+    accentSoft: "rgba(143, 174, 158, 0.16)",
+    heroTitle: "今天很吵吧。",
+    heroSubline: "这里可以安静一点。",
+    greeting: "回来了。要是还不想说话，就先坐会儿，我陪你听听雨。",
+    voicePreview: "灯先别关。再坐一会儿，我放点轻音乐。",
+    voice: { rate: 0.9, pitch: 0.96, index: 3 },
+    sleepScene: "雨声修复室",
+    sleepLines: [
+      "听见雨声了吗？躺舒服一点。",
+      "不用管呼吸，怎么舒服怎么来。",
+      "眼睛放松，肩膀也松一松。",
+      "没想明白的事，今晚先不想了。",
+      "雨还在下，房间很安静。",
+      "晚安。你现在只需要睡觉。",
+    ],
+    workReply:
+      "你今天已经听了太多人的要求。先圈出真正属于你的那一件，其余的今晚先静音。",
+    upsetReply:
+      "难过不用急着变好。你先在这里待会儿，我给你留的位置还空着。",
+    cheerReply:
+      "不一定非要大笑。先把嘴角借我一点点，剩下的慢慢来。",
+    fallbackReplies: [
+      "不用找一个漂亮的开头，想到哪里就说到哪里。",
+      "今天的声音听起来有点累。先在我这里安静一会儿。",
+      "不想说也没关系。你留下来，我就把这段安静陪完。",
+    ],
+    profileQuote: "你安静的时候，我也会陪着。",
+  },
+};
+
+const CHARACTER_IDS = Object.keys(CHARACTERS) as CharacterId[];
+
+const INITIAL_MEMORIES: Memory[] = [
+  { id: 1, text: "你喜欢雨声，但不喜欢突然的雷声。", date: "今晚" },
+  { id: 2, text: "睡不着时，比起建议，你更想先被好好听完。", date: "今晚" },
+  { id: 3, text: "你希望被温柔地提醒，而不是被催促。", date: "初次见面" },
+];
+
+function initialMessages(profile: CharacterProfile): Message[] {
+  return [
+    {
+      id: Number(`${CHARACTER_IDS.indexOf(profile.id) + 1}01`),
+      role: "companion",
+      text: profile.greeting,
+      time: "22:18",
+    },
+    {
+      id: Number(`${CHARACTER_IDS.indexOf(profile.id) + 1}02`),
+      role: "system",
+      text: `小提示：${profile.name}是虚拟角色，不能替代真人陪伴或专业心理帮助。`,
+      time: "",
+    },
+  ];
+}
+
+function nowTime() {
+  return new Intl.DateTimeFormat("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date());
+}
+
+export default function Home() {
+  const [tab, setTab] = useState<Tab>("tonight");
+  const [selectedId, setSelectedId] = useState<CharacterId>("pei");
+  const [messagesByCharacter, setMessagesByCharacter] = useState<
+    Record<CharacterId, Message[]>
+  >({
+    pei: initialMessages(CHARACTERS.pei),
+    chi: initialMessages(CHARACTERS.chi),
+    yan: initialMessages(CHARACTERS.yan),
+    lu: initialMessages(CHARACTERS.lu),
+  });
+  const [memories, setMemories] = useState<Memory[]>(INITIAL_MEMORIES);
+  const [input, setInput] = useState("");
+  const [sleepOpen, setSleepOpen] = useState(false);
+  const [sleeping, setSleeping] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(12 * 60);
+  const [sleepLine, setSleepLine] = useState(0);
+  const [memoryDraft, setMemoryDraft] = useState("");
+  const [voiceOn, setVoiceOn] = useState(true);
+  const [voiceLoading, setVoiceLoading] = useState(false);
+  const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>("auto");
+  const [developerVoiceIds, setDeveloperVoiceIds] = useState<
+    Partial<Record<CharacterId, string>>
+  >({});
+  const [voiceCaptureState, setVoiceCaptureState] =
+    useState<VoiceCaptureState>("idle");
+  const [voiceSeconds, setVoiceSeconds] = useState(0);
+  const [voiceCancelIntent, setVoiceCancelIntent] = useState(false);
+  const [voiceCaptureNotice, setVoiceCaptureNotice] = useState("");
+  const [replyLoading, setReplyLoading] = useState(false);
+  const [showBoundary, setShowBoundary] = useState(false);
+  const endRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
+  const ttsAudioCacheRef = useRef<Map<string, Blob>>(new Map());
+  const voiceRequestRef = useRef<AbortController | null>(null);
+  const chatRequestRef = useRef<AbortController | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const speechRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+  const voiceChunksRef = useRef<Blob[]>([]);
+  const voiceTranscriptRef = useRef("");
+  const voiceAudioUrlRef = useRef<string | null>(null);
+  const voiceMessageUrlsRef = useRef<Set<string>>(new Set());
+  const voiceRecordingStartedAtRef = useRef(0);
+  const voiceTimerRef = useRef<number | null>(null);
+  const voiceNoticeTimerRef = useRef<number | null>(null);
+  const voicePressActiveRef = useRef(false);
+  const voiceSessionActiveRef = useRef(false);
+  const voiceCancelIntentRef = useRef(false);
+  const recorderFinishedRef = useRef(false);
+  const recognitionFinishedRef = useRef(false);
+  const voiceCaptureErrorRef = useRef("");
+  const pendingVoiceMessageRef = useRef<PendingVoiceMessage | null>(null);
+  const voicePointerStartYRef = useRef(0);
+
+  const character = CHARACTERS[selectedId];
+  const messages = messagesByCharacter[selectedId];
+  const characterStyle = {
+    "--character-accent": character.accent,
+    "--character-soft": character.accentSoft,
+    "--character-image": `url("${character.image}")`,
+  } as CSSProperties;
+
+  useEffect(() => {
+    const savedMemories = window.localStorage.getItem("night-voyage-memories");
+    const savedCharacter = window.localStorage.getItem(
+      "night-voyage-character",
+    ) as CharacterId | null;
+    if (savedMemories) {
+      try {
+        setMemories(JSON.parse(savedMemories));
+      } catch {
+        window.localStorage.removeItem("night-voyage-memories");
+      }
+    }
+    if (savedCharacter && CHARACTER_IDS.includes(savedCharacter)) {
+      setSelectedId(savedCharacter);
+    }
+  }, []);
+
+  useEffect(() => {
+    function syncDeveloperVoices() {
+      const stored = window.localStorage.getItem(
+        DEVELOPER_VOICE_STORAGE_KEY,
+      );
+      if (!stored) {
+        setDeveloperVoiceIds({});
+        return;
+      }
+      try {
+        const parsed = JSON.parse(stored) as Record<string, unknown>;
+        setDeveloperVoiceIds(
+          Object.fromEntries(
+            CHARACTER_IDS.flatMap((id) =>
+              typeof parsed[id] === "string" ? [[id, parsed[id]]] : [],
+            ),
+          ) as Partial<Record<CharacterId, string>>,
+        );
+      } catch {
+        window.localStorage.removeItem(DEVELOPER_VOICE_STORAGE_KEY);
+        setDeveloperVoiceIds({});
+      }
+    }
+
+    syncDeveloperVoices();
+    window.addEventListener("storage", syncDeveloperVoices);
+    return () => window.removeEventListener("storage", syncDeveloperVoices);
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      "night-voyage-memories",
+      JSON.stringify(memories),
+    );
+  }, [memories]);
+
+  useEffect(() => {
+    window.localStorage.setItem("night-voyage-character", selectedId);
+    setSleepLine(0);
+    setShowBoundary(false);
+  }, [selectedId]);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, tab]);
+
+  useEffect(() => {
+    const voiceUrls = voiceMessageUrlsRef.current;
+    return () => {
+      if (voiceTimerRef.current !== null) {
+        window.clearInterval(voiceTimerRef.current);
+      }
+      if (voiceNoticeTimerRef.current !== null) {
+        window.clearTimeout(voiceNoticeTimerRef.current);
+      }
+      speechRecognitionRef.current?.abort();
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      voiceUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!sleeping) return;
+    const timer = window.setInterval(() => {
+      setSecondsLeft((current) => {
+        if (current <= 1) {
+          setSleeping(false);
+          return 0;
+        }
+        return current - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [sleeping]);
+
+  useEffect(() => {
+    if (!sleeping) return;
+    const lineTimer = window.setInterval(() => {
+      setSleepLine((current) =>
+        current < character.sleepLines.length - 1 ? current + 1 : current,
+      );
+    }, 22000);
+    return () => window.clearInterval(lineTimer);
+  }, [character.sleepLines.length, sleeping]);
+
+  useEffect(() => {
+    if (!sleeping || !voiceOn || typeof window === "undefined") return;
+    speak(character.sleepLines[sleepLine], true);
+    return stopVoice;
+  }, [character, sleepLine, sleeping, voiceOn]);
+
+  const clock = useMemo(() => {
+    const minutes = Math.floor(secondsLeft / 60)
+      .toString()
+      .padStart(2, "0");
+    const seconds = (secondsLeft % 60).toString().padStart(2, "0");
+    return `${minutes}:${seconds}`;
+  }, [secondsLeft]);
+
+  function releaseAudio() {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+      audioRef.current = null;
+    }
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current);
+      audioUrlRef.current = null;
+    }
+  }
+
+  function stopVoice() {
+    voiceRequestRef.current?.abort();
+    voiceRequestRef.current = null;
+    releaseAudio();
+    window.speechSynthesis?.cancel();
+    setVoiceLoading(false);
+  }
+
+  function fallbackSpeak(text: string, sleepVoice = false) {
+    window.speechSynthesis.cancel();
+    const phrase = new SpeechSynthesisUtterance(text);
+    const chineseVoices = window.speechSynthesis
+      .getVoices()
+      .filter((voice) => /^zh/i.test(voice.lang));
+    if (chineseVoices.length) {
+      phrase.voice =
+        chineseVoices[character.voice.index % chineseVoices.length];
+    }
+    phrase.lang = "zh-CN";
+    phrase.rate = sleepVoice
+      ? Math.max(0.58, character.voice.rate - 0.08)
+      : character.voice.rate;
+    phrase.pitch = character.voice.pitch;
+    phrase.volume = sleepVoice ? 0.7 : 0.86;
+    window.speechSynthesis.speak(phrase);
+  }
+
+  async function playNaturalVoice(text: string, sleepVoice = false) {
+    stopVoice();
+    const voiceId = developerVoiceIds[character.id];
+    const cacheKey = [
+      character.id,
+      voiceId || "default",
+      sleepVoice ? "sleep" : "chat",
+      text,
+    ].join("|");
+    const requestController = new AbortController();
+    voiceRequestRef.current = requestController;
+    setVoiceLoading(true);
+
+    try {
+      let blob = ttsAudioCacheRef.current.get(cacheKey);
+      if (!blob) {
+        const response = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text,
+            characterId: character.id,
+            scene: sleepVoice ? "sleep" : "chat",
+            voiceId,
+          }),
+          signal: requestController.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`TTS request failed with ${response.status}`);
+        }
+
+        recordTtsUsage(response, {
+          source: sleepVoice ? "sleep" : "chat",
+          characterId: character.id,
+          characters: text.length,
+          voiceId,
+        });
+        blob = await response.blob();
+        if (blob.size) ttsAudioCacheRef.current.set(cacheKey, blob);
+      }
+      if (!blob.size || voiceRequestRef.current !== requestController) return;
+
+      const audioUrl = URL.createObjectURL(blob);
+      const audio = new Audio(audioUrl);
+      audio.volume = sleepVoice ? 0.76 : 0.92;
+      audio.preload = "auto";
+      audioRef.current = audio;
+      audioUrlRef.current = audioUrl;
+      setVoiceProvider("natural");
+
+      audio.onended = releaseAudio;
+      audio.onerror = releaseAudio;
+      await audio.play();
+    } catch (error) {
+      if (
+        requestController.signal.aborted ||
+        voiceRequestRef.current !== requestController
+      ) {
+        return;
+      }
+      console.warn("Natural voice unavailable; using device voice.", error);
+      releaseAudio();
+      setVoiceProvider("device");
+      fallbackSpeak(text, sleepVoice);
+    } finally {
+      if (voiceRequestRef.current === requestController) {
+        voiceRequestRef.current = null;
+        setVoiceLoading(false);
+      }
+    }
+  }
+
+  function speak(text: string, sleepVoice = false) {
+    if (!voiceOn || typeof window === "undefined") return;
+    void playNaturalVoice(text, sleepVoice);
+  }
+
+  function setVoiceEnabled(enabled: boolean) {
+    if (!enabled) stopVoice();
+    setVoiceOn(enabled);
+  }
+
+  function stopVoiceTimer() {
+    if (voiceTimerRef.current !== null) {
+      window.clearInterval(voiceTimerRef.current);
+      voiceTimerRef.current = null;
+    }
+  }
+
+  function releaseVoiceInputStream() {
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
+  }
+
+  function showVoiceCaptureError(message: string) {
+    stopVoiceTimer();
+    speechRecognitionRef.current?.abort();
+    speechRecognitionRef.current = null;
+    const recorder = mediaRecorderRef.current;
+    if (recorder?.state === "recording") {
+      recorder.onstop = null;
+      recorder.stop();
+    }
+    mediaRecorderRef.current = null;
+    releaseVoiceInputStream();
+    voiceSessionActiveRef.current = false;
+    pendingVoiceMessageRef.current = null;
+    setVoiceCaptureNotice(message);
+    setVoiceCaptureState("error");
+    if (voiceNoticeTimerRef.current !== null) {
+      window.clearTimeout(voiceNoticeTimerRef.current);
+    }
+    voiceNoticeTimerRef.current = window.setTimeout(() => {
+      setVoiceCaptureState("idle");
+      setVoiceCaptureNotice("");
+      voiceNoticeTimerRef.current = null;
+    }, 3200);
+  }
+
+  function tryFinalizeVoiceMessage() {
+    const pending = pendingVoiceMessageRef.current;
+    if (
+      !pending ||
+      !recorderFinishedRef.current ||
+      !recognitionFinishedRef.current
+    ) {
+      return;
+    }
+
+    pendingVoiceMessageRef.current = null;
+    voiceSessionActiveRef.current = false;
+    releaseVoiceInputStream();
+
+    const transcript = voiceTranscriptRef.current.trim();
+    const audioUrl = voiceAudioUrlRef.current;
+    const captureError = voiceCaptureErrorRef.current;
+
+    if (captureError || !transcript) {
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+      voiceAudioUrlRef.current = null;
+      showVoiceCaptureError(
+        captureError || "刚才没听清，再按住说一次试试",
+      );
+      return;
+    }
+
+    if (audioUrl) {
+      voiceMessageUrlsRef.current.add(audioUrl);
+    }
+    appendMessagesFor(pending.profileId, [
+      {
+        id: Date.now(),
+        role: "user",
+        kind: "voice",
+        text: transcript,
+        audioUrl: audioUrl ?? undefined,
+        duration: pending.duration,
+        time: nowTime(),
+      },
+    ]);
+    setVoiceCaptureState("idle");
+    setVoiceCaptureNotice("");
+    void respondToMessage(
+      pending.profileId,
+      transcript,
+      pending.history,
+    );
+  }
+
+  function cancelVoiceCapture() {
+    voicePressActiveRef.current = false;
+    voiceSessionActiveRef.current = false;
+    pendingVoiceMessageRef.current = null;
+    stopVoiceTimer();
+    speechRecognitionRef.current?.abort();
+    speechRecognitionRef.current = null;
+    const recorder = mediaRecorderRef.current;
+    if (recorder?.state === "recording") recorder.stop();
+    mediaRecorderRef.current = null;
+    releaseVoiceInputStream();
+    if (voiceAudioUrlRef.current) {
+      URL.revokeObjectURL(voiceAudioUrlRef.current);
+      voiceAudioUrlRef.current = null;
+    }
+    setVoiceCancelIntent(false);
+    voiceCancelIntentRef.current = false;
+    setVoiceSeconds(0);
+    setVoiceCaptureNotice("已取消");
+    setVoiceCaptureState("idle");
+  }
+
+  async function startVoiceCapture() {
+    if (
+      replyLoading ||
+      voiceSessionActiveRef.current ||
+      voiceCaptureState === "processing"
+    ) {
+      return;
+    }
+
+    const speechWindow = window as typeof window & {
+      SpeechRecognition?: SpeechRecognitionConstructor;
+      webkitSpeechRecognition?: SpeechRecognitionConstructor;
+    };
+    const Recognition =
+      speechWindow.SpeechRecognition ??
+      speechWindow.webkitSpeechRecognition;
+
+    if (
+      !navigator.mediaDevices?.getUserMedia ||
+      typeof MediaRecorder === "undefined" ||
+      !Recognition
+    ) {
+      showVoiceCaptureError("当前浏览器暂不支持按住说话，请使用最新版 Chrome");
+      return;
+    }
+
+    setVoiceCaptureState("requesting");
+    setVoiceCaptureNotice("正在连接麦克风…");
+    setVoiceSeconds(0);
+    voiceTranscriptRef.current = "";
+    voiceChunksRef.current = [];
+    voiceAudioUrlRef.current = null;
+    voiceCaptureErrorRef.current = "";
+    recorderFinishedRef.current = false;
+    recognitionFinishedRef.current = false;
+    pendingVoiceMessageRef.current = null;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+
+      if (!voicePressActiveRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        setVoiceCaptureState("idle");
+        setVoiceCaptureNotice("");
+        return;
+      }
+
+      const recorder = new MediaRecorder(stream);
+      const recognition = new Recognition();
+      mediaStreamRef.current = stream;
+      mediaRecorderRef.current = recorder;
+      speechRecognitionRef.current = recognition;
+      voiceSessionActiveRef.current = true;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) voiceChunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        if (voiceSessionActiveRef.current) {
+          const blob = new Blob(voiceChunksRef.current, {
+            type: recorder.mimeType || "audio/webm",
+          });
+          if (blob.size) {
+            voiceAudioUrlRef.current = URL.createObjectURL(blob);
+          }
+        }
+        recorderFinishedRef.current = true;
+        mediaRecorderRef.current = null;
+        tryFinalizeVoiceMessage();
+      };
+
+      recognition.lang = "zh-CN";
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.onresult = (event) => {
+        let transcript = "";
+        for (let index = 0; index < event.results.length; index += 1) {
+          transcript += event.results[index][0]?.transcript ?? "";
+        }
+        voiceTranscriptRef.current = transcript;
+        if (transcript.trim()) {
+          setVoiceCaptureNotice(transcript.trim());
+        }
+      };
+      recognition.onerror = (event) => {
+        if (event.error === "aborted") return;
+        voiceCaptureErrorRef.current =
+          event.error === "not-allowed" || event.error === "service-not-allowed"
+            ? "没有麦克风权限，请在浏览器设置中开启"
+            : event.error === "no-speech"
+              ? "刚才没听清，再按住说一次试试"
+              : "语音识别暂时不可用，请稍后再试";
+      };
+      recognition.onend = () => {
+        recognitionFinishedRef.current = true;
+        speechRecognitionRef.current = null;
+        tryFinalizeVoiceMessage();
+      };
+
+      recorder.start(250);
+      recognition.start();
+      voiceRecordingStartedAtRef.current = Date.now();
+      setVoiceCaptureState("recording");
+      setVoiceCaptureNotice("松开发送，上滑取消");
+      voiceTimerRef.current = window.setInterval(() => {
+        const elapsed = Math.min(
+          60,
+          (Date.now() - voiceRecordingStartedAtRef.current) / 1000,
+        );
+        setVoiceSeconds(elapsed);
+        if (elapsed >= 60) finishVoiceCapture(false);
+      }, 100);
+    } catch (error) {
+      console.warn("Voice capture unavailable.", error);
+      showVoiceCaptureError("没有麦克风权限，请在浏览器设置中开启");
+    }
+  }
+
+  function finishVoiceCapture(cancelled: boolean) {
+    voicePressActiveRef.current = false;
+    stopVoiceTimer();
+
+    if (!voiceSessionActiveRef.current) {
+      if (voiceCaptureState === "requesting") {
+        setVoiceCaptureState("idle");
+        setVoiceCaptureNotice("");
+      }
+      return;
+    }
+    if (cancelled) {
+      cancelVoiceCapture();
+      return;
+    }
+
+    const duration = Math.max(
+      1,
+      Math.round((Date.now() - voiceRecordingStartedAtRef.current) / 1000),
+    );
+    pendingVoiceMessageRef.current = {
+      profileId: selectedId,
+      history: messages,
+      duration,
+    };
+    setVoiceCaptureState("processing");
+    setVoiceCaptureNotice("正在识别你说的话…");
+
+    const recorder = mediaRecorderRef.current;
+    if (recorder?.state === "recording") {
+      recorder.stop();
+    } else {
+      recorderFinishedRef.current = true;
+    }
+
+    const recognition = speechRecognitionRef.current;
+    if (recognition) {
+      try {
+        recognition.stop();
+      } catch {
+        recognitionFinishedRef.current = true;
+      }
+    } else {
+      recognitionFinishedRef.current = true;
+    }
+    tryFinalizeVoiceMessage();
+  }
+
+  function playVoiceMessage(audioUrl?: string) {
+    if (!audioUrl) return;
+    stopVoice();
+    const audio = new Audio(audioUrl);
+    audioRef.current = audio;
+    audio.onended = () => {
+      if (audioRef.current === audio) audioRef.current = null;
+    };
+    audio.onerror = () => {
+      if (audioRef.current === audio) audioRef.current = null;
+    };
+    void audio.play();
+  }
+
+  function appendMessagesFor(
+    characterId: CharacterId,
+    newMessages: Message[],
+  ) {
+    setMessagesByCharacter((current) => ({
+      ...current,
+      [characterId]: [...current[characterId], ...newMessages],
+    }));
+  }
+
+  function selectCharacter(nextId: CharacterId) {
+    stopVoice();
+    chatRequestRef.current?.abort();
+    chatRequestRef.current = null;
+    setReplyLoading(false);
+    setSelectedId(nextId);
+    setInput("");
+  }
+
+  function openChat() {
+    if (replyLoading) return;
+    setTab("chat");
+  }
+
+  function fallbackReplyFor(
+    text: string,
+    profile: CharacterProfile,
+    conversation: Message[],
+  ) {
+    const highRisk =
+      /(不想活|想死|死了算了|自杀|轻生|自残|结束生命|活不下去|活着没意思|不想醒来)/.test(
+        text,
+      );
+    if (highRisk) {
+      setShowBoundary(true);
+      return "我有点担心你现在的安全。先别一个人待着，也把可能伤到自己的东西放远。马上联系你信任的人，请对方现在来陪你；如果危险就在眼前，请立刻联系当地急救或报警。这个情况不能只靠线上聊天，但我会陪你把求助消息发出去。";
+    }
+    let candidates = profile.fallbackReplies;
+    if (/(睡不着|失眠|睡觉|晚安)/.test(text)) {
+      candidates = [
+        `困了吗？那就别硬撑了。要不要现在开一段哄睡？`,
+        ...profile.fallbackReplies,
+      ];
+    } else if (/(怎么办|怎么做|帮我想|理一理|捋一捋|选择|决定)/.test(text)) {
+      candidates = [profile.workReply, ...profile.fallbackReplies];
+    } else if (/(哄哄|开心|逗我|笑一下|换个心情)/.test(text)) {
+      candidates = [profile.cheerReply, ...profile.fallbackReplies];
+    } else if (/(难过|委屈|哭|累|烦)/.test(text)) {
+      candidates = [profile.upsetReply, ...profile.fallbackReplies];
+    }
+    const previousReply = [...conversation]
+      .reverse()
+      .find((item) => item.role === "companion")?.text;
+    const available = candidates.filter((item) => item !== previousReply);
+    const choices = available.length ? available : candidates;
+    return choices[Math.floor(Math.random() * choices.length)];
+  }
+
+  async function respondToMessage(
+    profileId: CharacterId,
+    text: string,
+    conversation: Message[],
+  ) {
+    const profile = CHARACTERS[profileId];
+    const highRisk =
+      /(不想活|想死|死了算了|自杀|轻生|自残|结束生命|活不下去|活着没意思|不想醒来)/.test(
+        text,
+      );
+    if (highRisk) {
+      const reply = fallbackReplyFor(
+        text,
+        profile,
+        conversation,
+      );
+      appendMessagesFor(profileId, [
+        {
+          id: Date.now() + 1,
+          role: "companion",
+          text: reply,
+          time: nowTime(),
+        },
+      ]);
+      speak(reply);
+      return;
+    }
+
+    chatRequestRef.current?.abort();
+    const requestController = new AbortController();
+    chatRequestRef.current = requestController;
+    setReplyLoading(true);
+
+    let reply: string;
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          characterId: profileId,
+          message: text,
+          history: conversation
+            .filter((item) => item.role !== "system")
+            .slice(-10)
+            .map((item) => ({
+              role: item.role === "user" ? "user" : "assistant",
+              content: item.text,
+            })),
+          memories: memories.slice(0, 6).map((item) => item.text),
+        }),
+        signal: requestController.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`Chat request failed with ${response.status}`);
+      }
+      const result = (await response.json()) as { reply?: string };
+      if (!result.reply?.trim()) {
+        throw new Error("Chat response was empty");
+      }
+      reply = result.reply.trim();
+    } catch (error) {
+      if (
+        requestController.signal.aborted ||
+        chatRequestRef.current !== requestController
+      ) {
+        return;
+      }
+      console.warn("Dynamic reply unavailable; using fallback reply.", error);
+      reply = fallbackReplyFor(text, profile, conversation);
+    } finally {
+      if (chatRequestRef.current === requestController) {
+        chatRequestRef.current = null;
+        setReplyLoading(false);
+      }
+    }
+
+    if (requestController.signal.aborted) return;
+    appendMessagesFor(profileId, [
+      {
+        id: Date.now() + 1,
+        role: "companion",
+        text: reply,
+        time: nowTime(),
+      },
+    ]);
+    speak(reply);
+  }
+
+  function sendMessage(event: FormEvent) {
+    event.preventDefault();
+    const text = input.trim();
+    if (!text || replyLoading) return;
+    const profileId = selectedId;
+    const history = messages;
+    appendMessagesFor(profileId, [
+      {
+        id: Date.now(),
+        role: "user",
+        kind: "text",
+        text,
+        time: nowTime(),
+      },
+    ]);
+    setInput("");
+    void respondToMessage(profileId, text, history);
+  }
+
+  function addMemory(event: FormEvent) {
+    event.preventDefault();
+    const text = memoryDraft.trim();
+    if (!text) return;
+    setMemories((current) => [
+      { id: Date.now(), text, date: `刚刚 · ${character.name}` },
+      ...current,
+    ]);
+    setMemoryDraft("");
+  }
+
+  function startSleep() {
+    setSleepOpen(true);
+    setSleeping(true);
+    setSecondsLeft(12 * 60);
+    setSleepLine(0);
+  }
+
+  function closeSleep() {
+    setSleeping(false);
+    setSleepOpen(false);
+    stopVoice();
+  }
+
+  return (
+    <main className="app-shell" style={characterStyle}>
+      <div className="ambient ambient-one" />
+      <div className="ambient ambient-two" />
+
+      <section
+        className={`phone-stage character-${selectedId} tab-${tab}`}
+        aria-label="夜航恋人"
+      >
+        <header className="topbar">
+          <button
+            className="brand"
+            type="button"
+            onClick={() => setTab("tonight")}
+            aria-label="返回首页"
+          >
+            <span className="brand-mark">夜</span>
+            <span>
+              <strong>夜航恋人</strong>
+              <small>正在和{character.name}聊天</small>
+            </span>
+          </button>
+          <div className="top-actions">
+            <span className="online-dot">{character.name}在</span>
+            <button
+              className="icon-button"
+              type="button"
+              onClick={() => setVoiceEnabled(!voiceOn)}
+              aria-label={voiceOn ? "关闭语音" : "打开语音"}
+              title={voiceOn ? "关闭语音" : "打开语音"}
+            >
+              {voiceOn ? "声" : "静"}
+            </button>
+          </div>
+        </header>
+
+        <div className={`content ${tab === "chat" ? "content-chat" : ""}`}>
+          {tab === "tonight" && (
+            <section className="tonight-view">
+              <div className="hero-card" key={character.id}>
+                <img
+                  src={character.image}
+                  alt={`${character.name}，${character.role}`}
+                  className="hero-image"
+                />
+                <div className="hero-shade" />
+                <span className="hero-name-mark" aria-hidden="true">
+                  {character.name}
+                </span>
+                <div className="hero-status">
+                  <span className="status-pill">{character.archetype}</span>
+                  <p>{character.age}岁 · 现在有空</p>
+                </div>
+                <div className="hero-copy">
+                  <p className="eyebrow">{character.name}在等你</p>
+                  <h1>{character.heroTitle}</h1>
+                  <p>{character.heroSubline}</p>
+                </div>
+              </div>
+
+              <section className="character-selector">
+                <div className="section-heading compact">
+                  <div>
+                    <span>换个人聊聊</span>
+                    <h2>今晚想和谁待一会儿？</h2>
+                  </div>
+                  <span className="private-tag">随时可以换</span>
+                </div>
+                <div className="character-grid">
+                  {CHARACTER_IDS.map((id) => {
+                    const item = CHARACTERS[id];
+                    return (
+                      <button
+                        type="button"
+                        key={id}
+                        className={id === selectedId ? "active" : ""}
+                        onClick={() => selectCharacter(id)}
+                        aria-pressed={id === selectedId}
+                      >
+                        <span className="character-thumb">
+                          <img src={item.image} alt="" />
+                        </span>
+                        <strong>{item.name}</strong>
+                        <small>{item.archetype}</small>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <button
+                className="conversation-entry"
+                type="button"
+                onClick={openChat}
+              >
+                <span>
+                  <small>不用先想该怎么说</small>
+                  <strong>找{character.name}聊聊</strong>
+                  <span>他会跟着你现在的状态回应。</span>
+                </span>
+                <b>开始</b>
+              </button>
+
+              <button className="sleep-entry" type="button" onClick={startSleep}>
+                <span className="moon-orbit">
+                  <span className="moon-core">月</span>
+                </span>
+                <span className="sleep-entry-copy">
+                  <small>熄屏也能听</small>
+                  <strong>让{character.name}陪你睡一会儿</strong>
+                  <span>12 分钟 · {character.sleepScene}</span>
+                </span>
+                <span className="entry-arrow">进入</span>
+              </button>
+
+            </section>
+          )}
+
+          {tab === "chat" && (
+            <section className="chat-view">
+              <div className="chat-person">
+                <div className="avatar-wrap">
+                  <img src={character.image} alt="" />
+                  <span />
+                </div>
+                <div>
+                  <strong>{character.name}</strong>
+                  <small>想说什么都可以</small>
+                </div>
+                <button type="button" onClick={startSleep}>
+                  哄睡
+                </button>
+              </div>
+              <div className="chat-character-switch" aria-label="切换陪伴角色">
+                {CHARACTER_IDS.map((id) => (
+                  <button
+                    type="button"
+                    className={id === selectedId ? "active" : ""}
+                    onClick={() => selectCharacter(id)}
+                    key={id}
+                  >
+                    {CHARACTERS[id].name}
+                  </button>
+                ))}
+              </div>
+              <div className="messages" aria-live="polite">
+                {messages.map((message) =>
+                  message.role === "system" ? (
+                    <div className="system-message" key={message.id}>
+                      {message.text}
+                    </div>
+                  ) : (
+                    <div
+                      className={`message-row ${message.role}`}
+                      key={message.id}
+                    >
+                      {message.role === "companion" && (
+                        <img src={character.image} alt="" />
+                      )}
+                      <div>
+                        {message.kind === "voice" ? (
+                          <>
+                            <button
+                              className="voice-message"
+                              type="button"
+                              onClick={() => playVoiceMessage(message.audioUrl)}
+                              disabled={!message.audioUrl}
+                              aria-label={`播放${message.duration ?? 1}秒语音`}
+                            >
+                              <span className="voice-message-icon">
+                                <i />
+                                <i />
+                                <i />
+                                <i />
+                              </span>
+                              <strong>{message.duration ?? 1}″</strong>
+                            </button>
+                            <span className="voice-transcript">
+                              {message.text}
+                            </span>
+                          </>
+                        ) : (
+                          <p>{message.text}</p>
+                        )}
+                        <small>{message.time}</small>
+                      </div>
+                    </div>
+                  ),
+                )}
+                {replyLoading && (
+                  <div className="message-row companion reply-thinking">
+                    <img src={character.image} alt="" />
+                    <div>
+                      <p>{character.name}正在回复…</p>
+                    </div>
+                  </div>
+                )}
+                {showBoundary && (
+                  <div className="safety-card">
+                    <strong>现在先保证你的安全</strong>
+                    <p>
+                      先别一个人待着。请马上联系你信任的人，让对方来陪你；如果危险就在眼前，请联系当地急救或报警。
+                    </p>
+                    <button type="button" onClick={() => setShowBoundary(false)}>
+                      关闭提示
+                    </button>
+                  </div>
+                )}
+                <div ref={endRef} />
+              </div>
+              <form
+                className={`composer voice-${voiceCaptureState}${
+                  voiceCancelIntent ? " cancel-intent" : ""
+                }`}
+                onSubmit={sendMessage}
+              >
+                <button
+                  className="voice-hold-button"
+                  type="button"
+                  disabled={replyLoading || voiceCaptureState === "processing"}
+                  aria-label={
+                    voiceCaptureState === "recording"
+                      ? "松开发送语音"
+                      : "按住说话"
+                  }
+                  onContextMenu={(event) => event.preventDefault()}
+                  onPointerDown={(event) => {
+                    if (event.button !== 0) return;
+                    event.preventDefault();
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                    voicePointerStartYRef.current = event.clientY;
+                    voicePressActiveRef.current = true;
+                    setVoiceCancelIntent(false);
+                    voiceCancelIntentRef.current = false;
+                    void startVoiceCapture();
+                  }}
+                  onPointerMove={(event) => {
+                    if (!voicePressActiveRef.current) return;
+                    const shouldCancel =
+                      voicePointerStartYRef.current - event.clientY > 56;
+                    if (shouldCancel !== voiceCancelIntentRef.current) {
+                      voiceCancelIntentRef.current = shouldCancel;
+                      setVoiceCancelIntent(shouldCancel);
+                      setVoiceCaptureNotice(
+                        shouldCancel ? "松开取消" : "松开发送，上滑取消",
+                      );
+                    }
+                  }}
+                  onPointerUp={(event) => {
+                    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                      event.currentTarget.releasePointerCapture(event.pointerId);
+                    }
+                    finishVoiceCapture(voiceCancelIntentRef.current);
+                  }}
+                  onPointerCancel={() => finishVoiceCapture(true)}
+                  onKeyDown={(event) => {
+                    if (
+                      event.repeat ||
+                      (event.key !== " " && event.key !== "Enter")
+                    ) {
+                      return;
+                    }
+                    event.preventDefault();
+                    voicePressActiveRef.current = true;
+                    void startVoiceCapture();
+                  }}
+                  onKeyUp={(event) => {
+                    if (event.key !== " " && event.key !== "Enter") return;
+                    event.preventDefault();
+                    finishVoiceCapture(false);
+                  }}
+                >
+                  <span className="mic-glyph" aria-hidden="true" />
+                </button>
+                <label className="sr-only" htmlFor="chat-input">
+                  给{character.name}发消息
+                </label>
+                <div className="composer-field">
+                  <input
+                    id="chat-input"
+                    value={input}
+                    onChange={(event) => setInput(event.target.value)}
+                    placeholder={
+                      replyLoading
+                        ? `${character.name}正在输入…`
+                        : "想说什么都可以…"
+                    }
+                    autoComplete="off"
+                    disabled={
+                      replyLoading ||
+                      voiceCaptureState === "recording" ||
+                      voiceCaptureState === "processing"
+                    }
+                  />
+                  {voiceCaptureState !== "idle" && (
+                    <div className="voice-capture-status" aria-live="polite">
+                      {voiceCaptureState === "recording" && (
+                        <span className="recording-dot" />
+                      )}
+                      <span>{voiceCaptureNotice}</span>
+                      {voiceCaptureState === "recording" && (
+                        <b>{voiceSeconds.toFixed(1)}s</b>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <button
+                  className="send-message-button"
+                  type="submit"
+                  disabled={
+                    !input.trim() ||
+                    replyLoading ||
+                    voiceCaptureState !== "idle"
+                  }
+                >
+                  {replyLoading ? "发送中" : "发送"}
+                </button>
+              </form>
+            </section>
+          )}
+
+          {tab === "memory" && (
+            <section className="memory-view">
+              <div className="page-intro">
+                <span>记住的小事</span>
+                <h1>他们记得的你</h1>
+                <p>这里只保存你愿意留下的事，想删的时候随时可以删。</p>
+              </div>
+              <form className="memory-form" onSubmit={addMemory}>
+                <label htmlFor="memory-input">
+                  希望{character.name}记住什么？
+                </label>
+                <div>
+                  <input
+                    id="memory-input"
+                    value={memoryDraft}
+                    onChange={(event) => setMemoryDraft(event.target.value)}
+                    placeholder="例如：我喜欢下雨天…"
+                  />
+                  <button type="submit" disabled={!memoryDraft.trim()}>
+                    记住
+                  </button>
+                </div>
+              </form>
+              <div className="memory-list">
+                {memories.map((memory) => (
+                  <article key={memory.id}>
+                    <span className="memory-spark">✦</span>
+                    <div>
+                      <p>{memory.text}</p>
+                      <small>{memory.date}</small>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setMemories((current) =>
+                          current.filter((item) => item.id !== memory.id),
+                        )
+                      }
+                      aria-label={`删除记忆：${memory.text}`}
+                    >
+                      删除
+                    </button>
+                  </article>
+                ))}
+              </div>
+              <div className="privacy-note">
+                <strong>只保存在这台设备</strong>
+                <p>
+                  换一台设备不会自动带过去，你也可以随时逐条删除。
+                </p>
+              </div>
+            </section>
+          )}
+
+          {tab === "profile" && (
+            <section className="profile-view">
+              <div className="profile-portrait">
+                <img src={character.image} alt={character.name} />
+              </div>
+              <span className="status-pill">
+                {character.archetype} · 仅在线陪伴
+              </span>
+              <h1>{character.name}</h1>
+              <p className="profile-role">
+                {character.role} · {character.age}岁
+              </p>
+              <blockquote>“{character.profileQuote}”</blockquote>
+              <div className="profile-cast">
+                {CHARACTER_IDS.map((id) => (
+                  <button
+                    type="button"
+                    key={id}
+                    className={id === selectedId ? "active" : ""}
+                    onClick={() => selectCharacter(id)}
+                  >
+                    <img src={CHARACTERS[id].image} alt="" />
+                    <span>{CHARACTERS[id].name}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="profile-settings">
+                <label>
+                  <span>
+                    <strong>语音回复</strong>
+                    <small>{character.archetype}</small>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={voiceOn}
+                    onChange={(event) =>
+                      setVoiceEnabled(event.target.checked)
+                    }
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => speak(character.voicePreview)}
+                  disabled={voiceLoading}
+                >
+                  <span>
+                    <strong>听听{character.name}的声音</strong>
+                    <small>
+                      {voiceProvider === "natural"
+                        ? "当前声线已连接"
+                        : voiceProvider === "device"
+                          ? "正在使用设备声音"
+                          : "播放时会自动连接"}
+                    </small>
+                  </span>
+                  <b>{voiceLoading ? "生成中" : "播放"}</b>
+                </button>
+                <button type="button" onClick={() => setTab("memory")}>
+                  <span>
+                    <strong>管理记住的小事</strong>
+                    <small>{memories.length} 条，仅保存在本机</small>
+                  </span>
+                  <b>查看</b>
+                </button>
+              </div>
+              <div className="ai-boundary">
+                <strong>使用说明</strong>
+                <p>
+                  他们可以陪你聊天、放松和入睡，但不是真实的人，也不能替代医生、心理咨询师或你身边的人。
+                </p>
+              </div>
+            </section>
+          )}
+        </div>
+
+        <nav className="bottom-nav" aria-label="主要导航">
+          {[
+            ["tonight", "月", "今晚"],
+            ["chat", "话", "聊天"],
+            ["memory", "忆", "记忆"],
+            ["profile", "人", "角色"],
+          ].map(([item, glyph, label]) => (
+            <button
+              type="button"
+              key={item}
+              className={tab === item ? "active" : ""}
+              onClick={() => setTab(item as Tab)}
+            >
+              <span>{glyph}</span>
+              <small>{label}</small>
+            </button>
+          ))}
+        </nav>
+      </section>
+
+      {sleepOpen && (
+        <section
+          className={`sleep-overlay sleep-${selectedId}`}
+          role="dialog"
+          aria-modal="true"
+          style={characterStyle}
+        >
+          <div className="sleep-stars" />
+          <button
+            className="sleep-close"
+            type="button"
+            onClick={closeSleep}
+            aria-label="结束睡眠陪伴"
+          >
+            结束
+          </button>
+          <div className="sleep-content">
+            <span className="sleep-label">
+              {character.name} · {character.sleepScene}
+            </span>
+            <div className={`breathing-orb ${sleeping ? "is-playing" : ""}`}>
+              <span>晚安</span>
+            </div>
+            <p className="sleep-quote">{character.sleepLines[sleepLine]}</p>
+            <strong className="sleep-clock">{clock}</strong>
+            <small>结束时会自动停止播放</small>
+            <div className="sleep-controls">
+              <button
+                type="button"
+                onClick={() => setVoiceEnabled(!voiceOn)}
+              >
+                {voiceOn ? "语音开启" : "语音关闭"}
+              </button>
+              <button
+                className="play-button"
+                type="button"
+                onClick={() => setSleeping((current) => !current)}
+                aria-label={sleeping ? "暂停" : "继续"}
+              >
+                {sleeping ? "暂停" : "继续"}
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setSleepLine(
+                    (current) => (current + 1) % character.sleepLines.length,
+                  )
+                }
+              >
+                下一句
+              </button>
+            </div>
+          </div>
+          <p className="sleep-footer">
+            把手机放到一边也可以，结束后声音会自己停。
+          </p>
+        </section>
+      )}
+    </main>
+  );
+}
