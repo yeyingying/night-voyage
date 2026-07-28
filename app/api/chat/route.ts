@@ -230,9 +230,12 @@ function cleanReply(content: string) {
     .trim();
 }
 
-function replyNeedsRewrite(reply: string) {
+function replyNeedsRewrite(reply: string, message = "") {
   const repeatedOpening = (reply.match(/那就/g) ?? []).length > 1;
-  const shortQuestionReply = reply.length < 35 && /[？?]/u.test(reply);
+  const shortQuestionReply =
+    reply.length < 35 &&
+    /[？?]/u.test(reply) &&
+    (!message || replyEvadesDirectQuestion(message, reply));
   const genericComfort =
     /(作为[^，。]{0,10}|我理解你的感受|谢谢你愿意告诉我|你的感受很重要|值得被看见|提供情绪价值|我是你的|永远陪着你)/u.test(
       reply,
@@ -570,7 +573,7 @@ export async function POST(request: Request) {
     for (let rewriteAttempt = 0; rewriteAttempt < 2; rewriteAttempt += 1) {
       const needsRewrite =
         generated.ok &&
-        (replyNeedsRewrite(generated.reply) ||
+        (replyNeedsRewrite(generated.reply, message) ||
           replyHasBoundaryIssue(generated.reply) ||
           replyEvadesDirectQuestion(message, generated.reply));
       if (!needsRewrite) break;
@@ -590,7 +593,7 @@ export async function POST(request: Request) {
     !generated.ok ||
     !generated.reply ||
     generated.reply.length < 6 ||
-    replyNeedsRewrite(generated.reply) ||
+    replyNeedsRewrite(generated.reply, message) ||
     replyHasBoundaryIssue(generated.reply) ||
     replyEvadesDirectQuestion(message, generated.reply)
   ) {
