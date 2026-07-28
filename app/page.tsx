@@ -551,6 +551,7 @@ export default function Home() {
   const [voiceSeconds, setVoiceSeconds] = useState(0);
   const [voiceCancelIntent, setVoiceCancelIntent] = useState(false);
   const [voiceCaptureNotice, setVoiceCaptureNotice] = useState("");
+  const [voiceTapMode, setVoiceTapMode] = useState(false);
   const [replyLoading, setReplyLoading] = useState(false);
   const [showBoundary, setShowBoundary] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
@@ -572,6 +573,7 @@ export default function Home() {
   const voicePressActiveRef = useRef(false);
   const voiceSessionActiveRef = useRef(false);
   const voiceCancelIntentRef = useRef(false);
+  const voiceCaptureCancelledRef = useRef(false);
   const recorderFinishedRef = useRef(false);
   const recognitionFinishedRef = useRef(false);
   const voiceCaptureErrorRef = useRef("");
@@ -880,7 +882,9 @@ export default function Home() {
     mediaRecorderRef.current = null;
     releaseVoiceInputStream();
     voiceSessionActiveRef.current = false;
+    voiceCaptureCancelledRef.current = false;
     pendingVoiceMessageRef.current = null;
+    setVoiceTapMode(false);
     setVoiceCaptureNotice(message);
     setVoiceCaptureState("error");
     if (voiceNoticeTimerRef.current !== null) {
@@ -890,7 +894,7 @@ export default function Home() {
       setVoiceCaptureState("idle");
       setVoiceCaptureNotice("");
       voiceNoticeTimerRef.current = null;
-    }, 3200);
+    }, 6000);
   }
 
   function tryFinalizeVoiceMessage() {
@@ -936,6 +940,7 @@ export default function Home() {
     ]);
     setVoiceCaptureState("idle");
     setVoiceCaptureNotice("");
+    setVoiceTapMode(false);
     void respondToMessage(
       pending.profileId,
       transcript,
@@ -946,6 +951,7 @@ export default function Home() {
   function cancelVoiceCapture() {
     voicePressActiveRef.current = false;
     voiceSessionActiveRef.current = false;
+    voiceCaptureCancelledRef.current = true;
     pendingVoiceMessageRef.current = null;
     stopVoiceTimer();
     speechRecognitionRef.current?.abort();
@@ -961,6 +967,7 @@ export default function Home() {
     setVoiceCancelIntent(false);
     voiceCancelIntentRef.current = false;
     setVoiceSeconds(0);
+    setVoiceTapMode(false);
     setVoiceCaptureNotice("已取消");
     setVoiceCaptureState("idle");
   }
@@ -987,7 +994,9 @@ export default function Home() {
       typeof MediaRecorder === "undefined" ||
       !Recognition
     ) {
-      showVoiceCaptureError("当前浏览器暂不支持按住说话，请使用最新版 Chrome");
+      showVoiceCaptureError(
+        "当前浏览器不支持语音转文字，请用 Chrome 或 Safari 打开本站",
+      );
       return;
     }
 
@@ -998,6 +1007,7 @@ export default function Home() {
     voiceChunksRef.current = [];
     voiceAudioUrlRef.current = null;
     voiceCaptureErrorRef.current = "";
+    voiceCaptureCancelledRef.current = false;
     recorderFinishedRef.current = false;
     recognitionFinishedRef.current = false;
     pendingVoiceMessageRef.current = null;
@@ -1011,19 +1021,21 @@ export default function Home() {
         },
       });
 
-      if (!voicePressActiveRef.current) {
+      if (voiceCaptureCancelledRef.current) {
         stream.getTracks().forEach((track) => track.stop());
         setVoiceCaptureState("idle");
         setVoiceCaptureNotice("");
         return;
       }
 
+      const startsInTapMode = !voicePressActiveRef.current;
       const recorder = new MediaRecorder(stream);
       const recognition = new Recognition();
       mediaStreamRef.current = stream;
       mediaRecorderRef.current = recorder;
       speechRecognitionRef.current = recognition;
       voiceSessionActiveRef.current = true;
+      setVoiceTapMode(startsInTapMode);
 
       recorder.ondataavailable = (event) => {
         if (event.data.size) voiceChunksRef.current.push(event.data);
@@ -1074,7 +1086,11 @@ export default function Home() {
       recognition.start();
       voiceRecordingStartedAtRef.current = Date.now();
       setVoiceCaptureState("recording");
-      setVoiceCaptureNotice("松开发送，上滑取消");
+      setVoiceCaptureNotice(
+        startsInTapMode
+          ? "正在录音，再点一下发送"
+          : "松开发送，上滑取消",
+      );
       voiceTimerRef.current = window.setInterval(() => {
         const elapsed = Math.min(
           60,
@@ -1092,11 +1108,11 @@ export default function Home() {
   function finishVoiceCapture(cancelled: boolean) {
     voicePressActiveRef.current = false;
     stopVoiceTimer();
+    if (cancelled) voiceCaptureCancelledRef.current = true;
 
     if (!voiceSessionActiveRef.current) {
       if (voiceCaptureState === "requesting") {
-        setVoiceCaptureState("idle");
-        setVoiceCaptureNotice("");
+        setVoiceCaptureNotice("授权后会自动开始录音，再点一下即可发送");
       }
       return;
     }
@@ -1104,6 +1120,7 @@ export default function Home() {
       cancelVoiceCapture();
       return;
     }
+    setVoiceTapMode(false);
 
     const duration = Math.max(
       1,
@@ -1613,7 +1630,9 @@ export default function Home() {
                   disabled={replyLoading || voiceCaptureState === "processing"}
                   aria-label={
                     voiceCaptureState === "recording"
-                      ? "松开发送语音"
+                      ? voiceTapMode
+                        ? "点按发送语音"
+                        : "松开发送语音"
                       : "按住说话"
                   }
                   onContextMenu={(event) => event.preventDefault()}
