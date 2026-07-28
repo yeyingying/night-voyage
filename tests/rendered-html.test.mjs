@@ -44,3 +44,16 @@ test("guards adult intimacy, local photo previews, and character boundaries", as
   assert.match(chatRoute, /当前文本模型不会读取图片像素/);
   assert.match(chatRoute, /亲密图片互动仅向已确认成年的玩家开放/);
 });
+
+test("adds restrained character-led daily check-ins", async () => {
+  const { page, css } = await productSources();
+
+  assert.match(page, /PROACTIVE_FIRST_MINUTES = \[90, 150\]/);
+  assert.match(page, /PROACTIVE_FOLLOWUP_MINUTES = \[240, 360\]/);
+  assert.match(page, /PROACTIVE_DAILY_LIMIT = 3/);
+  assert.match(page, /PROACTIVE_MOMENTS: Record<CharacterId, string\[\]>/);
+  assert.match(page, /刚好想起你/);
+  assert.match(page, /主动来找你/);
+  assert.match(page, /CHAT_HISTORY_KEY/);
+  assert.match(css, /\.proactive-message-cue/);
+});

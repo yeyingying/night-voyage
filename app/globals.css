@@ -1406,6 +1406,10 @@ input:focus-visible {
   background: none;
 }
 
+.profile-settings label + label {
+  border-top: 1px solid var(--line);
+}
+
 .visual-style-setting {
   min-height: 76px;
   display: flex;
@@ -2443,6 +2447,15 @@ input:focus-visible {
 .message-row small {
   color: var(--text-subtle);
   font-size: 9px;
+}
+
+.proactive-message-cue {
+  width: fit-content;
+  display: block;
+  margin: 0 0 6px 3px;
+  color: var(--character-accent);
+  font-size: 8px;
+  letter-spacing: 0.08em;
 }
 
 .image-message-card {
