@@ -493,11 +493,20 @@ function nowTime() {
 
 function subscribeVisualStyle(onStoreChange: () => void) {
   window.addEventListener("popstate", onStoreChange);
-  return () => window.removeEventListener("popstate", onStoreChange);
+  window.addEventListener("night-voyage-visual-style-change", onStoreChange);
+  return () => {
+    window.removeEventListener("popstate", onStoreChange);
+    window.removeEventListener(
+      "night-voyage-visual-style-change",
+      onStoreChange,
+    );
+  };
 }
 
 function getVisualStyleSnapshot(): VisualStyle {
-  return new URLSearchParams(window.location.search).get("style") === "real"
+  const queryStyle = new URLSearchParams(window.location.search).get("style");
+  if (queryStyle === "real" || queryStyle === "manhwa") return queryStyle;
+  return window.localStorage.getItem("night-voyage-visual-style") === "real"
     ? "real"
     : "manhwa";
 }
@@ -1163,6 +1172,18 @@ export default function Home() {
     setInput("");
   }
 
+  function changeVisualStyle(nextStyle: VisualStyle) {
+    const url = new URL(window.location.href);
+    if (nextStyle === "real") {
+      url.searchParams.set("style", "real");
+    } else {
+      url.searchParams.delete("style");
+    }
+    window.localStorage.setItem("night-voyage-visual-style", nextStyle);
+    window.history.replaceState(window.history.state, "", url);
+    window.dispatchEvent(new Event("night-voyage-visual-style-change"));
+  }
+
   function openChat() {
     if (replyLoading) return;
     setTab("chat");
@@ -1393,7 +1414,10 @@ export default function Home() {
         <div className={`content ${tab === "chat" ? "content-chat" : ""}`}>
           {tab === "tonight" && (
             <section className="tonight-view">
-              <div className="hero-card" key={character.id}>
+              <div
+                className="hero-card"
+                key={`${character.id}-${visualStyle}`}
+              >
                 <img
                   src={characterImage}
                   alt={`${character.name}，${character.role}`}
@@ -1770,6 +1794,34 @@ export default function Home() {
                 ))}
               </div>
               <div className="profile-settings">
+                <div className="visual-style-setting">
+                  <span>
+                    <strong>视觉风格</strong>
+                    <small>8 位角色与界面会一起切换</small>
+                  </span>
+                  <div
+                    className="visual-style-segment"
+                    role="group"
+                    aria-label="选择视觉风格"
+                  >
+                    <button
+                      type="button"
+                      className={visualStyle === "manhwa" ? "active" : ""}
+                      aria-pressed={visualStyle === "manhwa"}
+                      onClick={() => changeVisualStyle("manhwa")}
+                    >
+                      韩漫
+                    </button>
+                    <button
+                      type="button"
+                      className={visualStyle === "real" ? "active" : ""}
+                      aria-pressed={visualStyle === "real"}
+                      onClick={() => changeVisualStyle("real")}
+                    >
+                      仿真人
+                    </button>
+                  </div>
+                </div>
                 <label>
                   <span>
                     <strong>语音回复</strong>

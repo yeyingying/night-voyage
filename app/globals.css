@@ -1402,6 +1402,55 @@ input:focus-visible {
   background: none;
 }
 
+.visual-style-setting {
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.visual-style-setting > span {
+  min-width: 0;
+}
+
+.visual-style-segment {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-shell);
+}
+
+.visual-style-segment button {
+  min-width: 58px;
+  min-height: 38px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  padding: 0 10px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) ease,
+    color var(--duration-fast) ease;
+}
+
+.visual-style-segment button:hover {
+  color: var(--text-primary);
+}
+
+.visual-style-segment button.active {
+  background: var(--character-soft);
+  color: color-mix(in srgb, var(--character-accent) 82%, white);
+}
+
 .profile-settings > button {
   border-top: 1px solid var(--line);
   color: inherit;
@@ -2881,6 +2930,15 @@ input:focus-visible {
 .visual-real .profile-settings {
   background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 10px 28px rgba(61, 80, 99, 0.06);
+}
+
+.visual-real .visual-style-segment {
+  background: #edf3f7;
+}
+
+.visual-real .visual-style-segment button.active {
+  background: #ffffff;
+  color: color-mix(in srgb, var(--character-accent) 56%, #33495c);
 }
 
 .visual-real .memory-form input {
