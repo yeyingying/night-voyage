@@ -23,9 +23,9 @@ export async function generateMetadata(): Promise<Metadata> {
     requestHeaders.get("x-forwarded-proto") ??
     (host.startsWith("localhost") ? "http" : "https");
   const base = new URL(`${protocol}://${host}`);
-  const title = "夜航恋人｜四种心动，四种陪伴";
+  const title = "夜航恋人｜今晚想和谁聊聊？";
   const description =
-    "每一次晚安，都是与你重逢。选择裴叙白、迟曜、谢临渊或陆听澜，体验不同性格、声线与熄屏哄睡。";
+    "四位性格不同的男主，陪你聊聊天、理理思绪，也陪你慢慢睡着。";
   const socialImage = new URL("/og.png", base).toString();
 
   return {
@@ -45,7 +45,7 @@ export async function generateMetadata(): Promise<Metadata> {
           url: socialImage,
           width: 1731,
           height: 909,
-          alt: "夜航恋人四位男主——每一次晚安，都是与你重逢",
+          alt: "夜航恋人的四位男主",
         },
       ],
     },

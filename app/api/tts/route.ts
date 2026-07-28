@@ -1,16 +1,23 @@
 import { env } from "cloudflare:workers";
+import {
+  DEFAULT_VOICES,
+  isCharacterId,
+  isValidVoiceId,
+  VOICE_SETTINGS,
+  type CharacterId,
+} from "@/lib/voice-config";
 
-type CharacterId = "pei" | "chi" | "yan" | "lu";
 type VoiceScene = "chat" | "sleep";
-type MiniMaxEmotion = "calm" | "happy";
 
 type RuntimeEnv = {
   MINIMAX_API_KEY?: string;
   MINIMAX_API_BASE?: string;
+  MINIMAX_SPEECH_MODEL?: string;
   MINIMAX_VOICE_PEI?: string;
   MINIMAX_VOICE_CHI?: string;
   MINIMAX_VOICE_YAN?: string;
   MINIMAX_VOICE_LU?: string;
+  ENABLE_VOICE_STUDIO?: string;
 };
 
 type MiniMaxResponse = {
@@ -22,27 +29,15 @@ type MiniMaxResponse = {
     status_code?: number;
     status_msg?: string;
   };
+  extra_info?: {
+    usage_characters?: number;
+    audio_length?: number;
+  };
+  trace_id?: string;
 };
 
-const DEFAULT_VOICES: Record<CharacterId, string> = {
-  pei: "ttv-voice-2026072523240526-Omu0wD2C",
-  chi: "ttv-voice-2026072523425526-j8spGMFf",
-  yan: "ttv-voice-2026072523430526-zZfm7sFe",
-  lu: "ttv-voice-2026072523425726-5po0jdg9",
-};
-
-const VOICE_SETTINGS: Record<
-  CharacterId,
-  { speed: number; pitch: number; emotion: MiniMaxEmotion }
-> = {
-  pei: { speed: 0.94, pitch: 0, emotion: "calm" },
-  chi: { speed: 1.01, pitch: 0, emotion: "calm" },
-  yan: { speed: 0.98, pitch: 0, emotion: "calm" },
-  lu: { speed: 0.96, pitch: 0, emotion: "calm" },
-};
-
-const CHARACTER_IDS = new Set<CharacterId>(["pei", "chi", "yan", "lu"]);
 const SCENES = new Set<VoiceScene>(["chat", "sleep"]);
+const SPEECH_MODELS = new Set(["speech-2.8-turbo", "speech-2.8-hd"]);
 
 function runtimeEnv(): RuntimeEnv {
   return {
@@ -51,13 +46,21 @@ function runtimeEnv(): RuntimeEnv {
   };
 }
 
-function customVoiceId(characterId: CharacterId, runtime: RuntimeEnv) {
+function customVoiceId(
+  characterId: CharacterId,
+  runtime: RuntimeEnv,
+  requestedVoiceId?: string,
+) {
+  const studioEnabled =
+    process.env.NODE_ENV !== "production" ||
+    runtime.ENABLE_VOICE_STUDIO === "true";
+  if (studioEnabled && requestedVoiceId) return requestedVoiceId;
   const key = `MINIMAX_VOICE_${characterId.toUpperCase()}` as keyof RuntimeEnv;
   return runtime[key]?.trim() || DEFAULT_VOICES[characterId];
 }
 
 function sleepPacing(text: string) {
-  return text.replace(/([。！？])(?=.)/g, "$1<#0.45#>");
+  return text.replace(/([。！？])(?=.)/g, "$1<#0.32#>");
 }
 
 function hexToBytes(hex: string) {
@@ -82,6 +85,8 @@ export async function POST(request: Request) {
     text?: unknown;
     characterId?: unknown;
     scene?: unknown;
+    voiceId?: unknown;
+    model?: unknown;
   };
 
   try {
@@ -93,6 +98,16 @@ export async function POST(request: Request) {
   const text = typeof payload.text === "string" ? payload.text.trim() : "";
   const characterId = payload.characterId as CharacterId;
   const scene = (payload.scene ?? "chat") as VoiceScene;
+  const requestedVoiceId =
+    payload.voiceId === undefined
+      ? undefined
+      : isValidVoiceId(payload.voiceId)
+        ? payload.voiceId
+        : null;
+  const requestedModel =
+    typeof payload.model === "string" && SPEECH_MODELS.has(payload.model)
+      ? payload.model
+      : undefined;
 
   if (!text || text.length > 800) {
     return Response.json(
@@ -100,8 +115,11 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  if (!CHARACTER_IDS.has(characterId) || !SCENES.has(scene)) {
+  if (!isCharacterId(characterId) || !SCENES.has(scene)) {
     return Response.json({ error: "角色或场景无效" }, { status: 400 });
+  }
+  if (requestedVoiceId === null) {
+    return Response.json({ error: "声线标识无效" }, { status: 400 });
   }
 
   const runtime = runtimeEnv();
@@ -114,8 +132,18 @@ export async function POST(request: Request) {
   }
 
   const voice = VOICE_SETTINGS[characterId];
-  const model = "speech-2.8-hd";
+  const configuredModel = runtime.MINIMAX_SPEECH_MODEL?.trim();
+  const model =
+    requestedModel ||
+    (configuredModel && SPEECH_MODELS.has(configuredModel)
+      ? configuredModel
+      : "speech-2.8-turbo");
   const preparedText = scene === "sleep" ? sleepPacing(text) : text;
+  const selectedVoiceId = customVoiceId(
+    characterId,
+    runtime,
+    requestedVoiceId,
+  );
 
   let upstream: Response;
   try {
@@ -135,8 +163,8 @@ export async function POST(request: Request) {
         language_boost: "Chinese",
         output_format: "hex",
         voice_setting: {
-          voice_id: customVoiceId(characterId, runtime),
-          speed: scene === "sleep" ? Math.max(0.8, voice.speed - 0.05) : voice.speed,
+          voice_id: selectedVoiceId,
+          speed: scene === "sleep" ? voice.sleepSpeed : voice.speed,
           vol: scene === "sleep" ? 0.86 : 1,
           pitch: voice.pitch,
           emotion: voice.emotion,
@@ -184,10 +212,20 @@ export async function POST(request: Request) {
 
   try {
     const audio = hexToBytes(result.data.audio);
+    const usageCharacters =
+      result.extra_info?.usage_characters ?? text.length;
+    const ratePerMillion = model.includes("turbo") ? 60 : 100;
+    const estimatedCostUsd =
+      (usageCharacters * ratePerMillion) / 1_000_000;
     return new Response(audio, {
       headers: {
         "Cache-Control": "private, no-store",
         "Content-Type": "audio/mpeg",
+        "X-Audio-Length-Ms": String(result.extra_info?.audio_length ?? ""),
+        "X-Estimated-Cost-Usd": estimatedCostUsd.toFixed(6),
+        "X-Trace-Id": result.trace_id ?? "",
+        "X-Usage-Characters": String(usageCharacters),
+        "X-Voice-Id": selectedVoiceId,
         "X-Voice-Model": model,
         "X-Voice-Provider": "minimax",
       },
