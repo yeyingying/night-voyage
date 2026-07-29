@@ -70,6 +70,21 @@ test("keeps the mobile chat composer visible without iOS input zoom", async () =
   assert.match(css, /\.phone-stage\.keyboard-open \.bottom-nav/);
 });
 
+test("starts a fresh speech recognition pass for every voice message", async () => {
+  const { page } = await productSources();
+
+  assert.match(page, /voiceRecognitionSessionRef/);
+  assert.match(page, /voiceRecognitionCommittedRef/);
+  assert.match(page, /stopVoiceRecognitionRestartTimer/);
+  assert.match(page, /const recognition = new Recognition\(\)/);
+  assert.match(page, /recognition\.continuous = false/);
+  assert.match(page, /const shouldContinue =/);
+  assert.match(page, /startRecognitionPass\(\)/);
+  assert.match(page, /stopVoice\(\);\s*stopVoiceRecognitionRestartTimer\(\)/);
+  assert.match(page, /recognition\.onresult = null/);
+  assert.match(page, /recognition\.onend = null/);
+});
+
 test("guards adult intimacy, local photo previews, and character boundaries", async () => {
   const { page, css, chatRoute } = await productSources();
 
