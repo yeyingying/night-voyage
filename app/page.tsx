@@ -368,7 +368,7 @@ const CHARACTERS: Record<CharacterId, CharacterProfile> = {
     archetype: "理性专业系",
     role: "睡眠模式研究员",
     image: "/shen-yanci.png",
-    realImage: "/real-shen-yanci-v2.jpg",
+    realImage: "/real-shen-yanci-v3.jpg",
     accent: "#9796c4",
     accentSoft: "rgba(151, 150, 196, 0.16)",
     heroTitle: "先别急着责怪自己。",
