@@ -146,7 +146,7 @@ const CHARACTERS: Record<CharacterId, CharacterProfile> = {
     archetype: "成熟守护系",
     role: "记忆重构师",
     image: "/pei-xubai.png",
-    realImage: "/real-pei-xubai-v3.jpg",
+    realImage: "/real-pei-xubai-v4.jpg",
     accent: "#d8bd82",
     accentSoft: "rgba(216, 189, 130, 0.16)",
     heroTitle: "累了就先歇会儿。",
