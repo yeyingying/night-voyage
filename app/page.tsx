@@ -1451,9 +1451,7 @@ export default function Home() {
     }
     phrase.lang = "zh-CN";
     const performance =
-      !sleepVoice && isPilotCharacter(character.id)
-        ? VOICE_PERFORMANCES[character.id][voiceMood]
-        : null;
+      !sleepVoice ? VOICE_PERFORMANCES[character.id][voiceMood] : null;
     phrase.rate = sleepVoice
       ? Math.max(0.58, character.voice.rate - 0.08)
       : Math.min(

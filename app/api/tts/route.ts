@@ -8,7 +8,6 @@ import {
 } from "@/lib/voice-config";
 import {
   applyVoiceBreak,
-  isPilotCharacter,
   VOICE_PERFORMANCES,
   type PersonaVoiceMood,
 } from "@/lib/persona-engine";
@@ -158,9 +157,7 @@ export async function POST(request: Request) {
 
   const voice = VOICE_SETTINGS[characterId];
   const performance =
-    scene === "chat" && isPilotCharacter(characterId)
-      ? VOICE_PERFORMANCES[characterId][voiceMood]
-      : null;
+    scene === "chat" ? VOICE_PERFORMANCES[characterId][voiceMood] : null;
   const configuredModel = runtime.MINIMAX_SPEECH_MODEL?.trim();
   const model =
     requestedModel ||

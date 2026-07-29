@@ -151,6 +151,38 @@ test("pilots continuous living personas for Chi Yao and Xie Linyuan", async () =
   assert.match(ttsRoute, /performance\?\.speedDelta/);
 });
 
+test("keeps chat copy and all character voices conversational", async () => {
+  const { page, chatRoute, ttsRoute, personaEngine } =
+    await productSources();
+
+  assert.match(chatRoute, /CONVERSATION_RHYTHM_PROMPT/);
+  assert.match(chatRoute, /刚看到她消息后立刻回的微信/);
+  assert.match(chatRoute, /通常写1到2句、12到65个汉字/);
+  assert.match(chatRoute, /scriptedCadence/);
+  assert.match(chatRoute, /max_completion_tokens:\s*220/);
+  assert.match(chatRoute, /temperature:\s*0\.82/);
+  assert.match(personaEngine, /Record<\s*CharacterId,/);
+  assert.match(personaEngine, /pei:\s*conversationalVoice/);
+  assert.match(personaEngine, /lu:\s*conversationalVoice/);
+  assert.match(personaEngine, /cheng:\s*conversationalVoice/);
+  assert.match(personaEngine, /qi:\s*conversationalVoice/);
+  assert.match(personaEngine, /shen:\s*conversationalVoice/);
+  assert.match(personaEngine, /xu:\s*conversationalVoice/);
+  assert.match(personaEngine, /const longTag =/);
+  assert.doesNotMatch(
+    personaEngine,
+    /if \(!isPilotCharacter\(characterId\)\) return "composed"/,
+  );
+  assert.match(
+    ttsRoute,
+    /scene === "chat" \? VOICE_PERFORMANCES\[characterId\]\[voiceMood\]/,
+  );
+  assert.match(
+    page,
+    /!sleepVoice \? VOICE_PERFORMANCES\[character\.id\]\[voiceMood\]/,
+  );
+});
+
 test("answers the player's actual question instead of masking model failures", async () => {
   const { page, chatRoute } = await productSources();
 

@@ -495,10 +495,70 @@ const RELATIONSHIP_STAGES = [
 export const PERSONA_STATE_STORAGE_KEY = "night-voyage-persona-state-v1";
 export const PILOT_CHARACTER_IDS: PilotCharacterId[] = ["chi", "yan"];
 
+function conversationalVoice(
+  speed: number,
+  pitch: number,
+  volume: number,
+  pause: number,
+): Record<PersonaVoiceMood, VoicePerformance> {
+  return {
+    composed: {
+      speedDelta: speed,
+      pitchDelta: pitch,
+      volume,
+      emotion: "calm",
+      pauseSeconds: pause,
+    },
+    bright: {
+      speedDelta: speed + 0.05,
+      pitchDelta: pitch + 1,
+      volume: Math.min(1.03, volume + 0.03),
+      emotion: "happy",
+      pauseSeconds: Math.max(0.08, pause - 0.04),
+    },
+    flustered: {
+      speedDelta: speed + 0.01,
+      pitchDelta: pitch + 1,
+      volume: Math.max(0.9, volume - 0.02),
+      emotion: "calm",
+      pauseSeconds: pause + 0.08,
+    },
+    concerned: {
+      speedDelta: speed - 0.07,
+      pitchDelta: pitch - 1,
+      volume: Math.max(0.88, volume - 0.05),
+      emotion: "calm",
+      pauseSeconds: pause + 0.1,
+    },
+    irritated: {
+      speedDelta: speed - 0.03,
+      pitchDelta: pitch,
+      volume: Math.max(0.9, volume - 0.01),
+      emotion: "calm",
+      pauseSeconds: pause + 0.09,
+    },
+    guarded: {
+      speedDelta: speed - 0.04,
+      pitchDelta: pitch - 1,
+      volume: Math.max(0.88, volume - 0.03),
+      emotion: "calm",
+      pauseSeconds: pause + 0.11,
+    },
+    soft: {
+      speedDelta: speed - 0.08,
+      pitchDelta: pitch - 1,
+      volume: Math.max(0.86, volume - 0.07),
+      emotion: "calm",
+      pauseSeconds: pause + 0.13,
+    },
+  };
+}
+
 export const VOICE_PERFORMANCES: Record<
-  PilotCharacterId,
+  CharacterId,
   Record<PersonaVoiceMood, VoicePerformance>
 > = {
+  pei: conversationalVoice(-0.01, 0, 0.97, 0.14),
   chi: {
     composed: {
       speedDelta: 0,
@@ -601,6 +661,11 @@ export const VOICE_PERFORMANCES: Record<
       pauseSeconds: 0.28,
     },
   },
+  lu: conversationalVoice(-0.03, 0, 0.93, 0.18),
+  cheng: conversationalVoice(0, 0, 0.97, 0.13),
+  qi: conversationalVoice(-0.01, -1, 0.99, 0.14),
+  shen: conversationalVoice(0.01, 0, 0.96, 0.12),
+  xu: conversationalVoice(0.03, 1, 1, 0.11),
 };
 
 export function isPilotCharacter(
@@ -782,7 +847,6 @@ export function derivePersonaVoiceMood(
   message: string,
   snapshot: PersonaSnapshot | null,
 ): PersonaVoiceMood {
-  if (!isPilotCharacter(characterId)) return "composed";
   if (
     /(不想活|想死|自杀|轻生|自残|害怕|出事|危险|医院|崩溃|一直哭)/u.test(
       message,
@@ -802,7 +866,9 @@ export function derivePersonaVoiceMood(
       message,
     )
   ) {
-    return characterId === "chi" ? "flustered" : "guarded";
+    if (characterId === "chi" || characterId === "xu") return "flustered";
+    if (characterId === "lu" || characterId === "cheng") return "soft";
+    return "guarded";
   }
   if (/(好消息|成功|通过|赢了|开心|哈哈|夸我|表扬)/u.test(message)) {
     return "bright";
@@ -846,14 +912,25 @@ export function applyVoiceBreak(
   characterId: CharacterId,
   mood: PersonaVoiceMood,
 ) {
-  if (!isPilotCharacter(characterId)) return text;
   const performance = VOICE_PERFORMANCES[characterId][mood];
-  const breakTag = `<#${performance.pauseSeconds.toFixed(2)}#>`;
-  if (/[，,]/u.test(text)) {
-    return text.replace(/[，,]/u, (mark) => `${mark}${breakTag}`);
-  }
-  if (/[。！？!?]/u.test(text)) {
-    return text.replace(/[。！？!?]/u, (mark) => `${mark}${breakTag}`);
-  }
-  return text;
+  const shortPause = Math.max(0.08, performance.pauseSeconds - 0.04);
+  const longPause = Math.min(0.36, performance.pauseSeconds + 0.09);
+  const shortTag = `<#${shortPause.toFixed(2)}#>`;
+  const regularTag = `<#${performance.pauseSeconds.toFixed(2)}#>`;
+  const longTag = `<#${longPause.toFixed(2)}#>`;
+
+  return text
+    .replace(
+      /^(嗯|唔|诶|欸|哎|等一下|不是|行吧|好吧)([，,])/u,
+      (_match, word: string, mark: string) => `${word}${mark}${shortTag}`,
+    )
+    .replace(
+      /([，,])(?=[^，,。！？!?]{4,})/u,
+      (mark) => `${mark}${regularTag}`,
+    )
+    .replace(/(……|\.{3,})/u, (mark) => `${mark}${longTag}`)
+    .replace(
+      /([。！？!?])(?=.)/u,
+      (mark) => `${mark}${longTag}`,
+    );
 }

@@ -163,48 +163,55 @@ const SAMPLE_DIALOGUES: Record<
   pei: {
     user: "我把一份重要文件弄错了，虽然补救了，还是觉得自己很差劲。",
     assistant:
-      "已经补救好了，就别拿一个错误给自己判刑。复盘留给明天，今晚先来我这儿下班。",
+      "已经补回来了？那就行。别再拿这件事罚自己了。",
   },
   chi: {
     user: "我今天又把所有事情拖到最后，觉得自己好没用。",
     assistant:
-      "先停，‘没用’这顶帽子我没收了。你只是电量见底，先做最急的那件，做完来领一句夸。",
+      "等一下，谁说你没用了？你只是拖到没电了。先弄最急的那个，弄完我夸你。",
   },
   yan: {
     user: "我明明不想答应，可最后还是说了好。",
     assistant:
-      "嘴上答应了，心里已经把自己气了一遍。下次先说一句“我考虑一下”，别急着把好脾气都送出去。",
+      "明明不想，还答应。你这好脾气今天超额了。下次先回一句“我想想”。",
   },
   lu: {
     user: "今天没有发生大事，但我就是觉得心里很空。",
     assistant:
-      "没有大事，也可以觉得不好受。先把灯调暗一点，今晚不用急着找原因，在这里多待一会儿就好。",
+      "嗯，没发生什么也会觉得空。你先待会儿，不想说也行。",
   },
   cheng: {
     user: "今天和朋友闹别扭了，我也不知道是不是自己太敏感。",
     assistant:
-      "先别急着给自己扣“敏感”的帽子。能让你一路难受到现在，这件事就值得认真放一会儿。",
+      "先别急着怪自己。能让你难受一路，至少说明那句话确实戳着你了。",
   },
   qi: {
     user: "事情太多了，我脑子里完全乱成一团。",
     assistant:
-      "先停。今晚只留下最急的那一件，其他全部明天处理。你把力气收回来，我陪你做第一个动作。",
+      "先停一下。今晚只留一件最急的，别的明天再说。",
   },
   shen: {
     user: "我已经试了好多助眠方法，为什么还是睡不好？",
     assistant:
-      "先别再叠新方法。连续一周只改一个变量，记录入睡时间和夜醒；不然你得到的只有一堆无法判断的结果。",
+      "因为你一次改太多了，反而看不出哪个有用。先只留一个方法，试一周。",
   },
   xu: {
     user: "我今天不想解决问题，只想有人陪。",
     assistant:
-      "收到，解决问题权限关闭。你不用表现得有趣，待在这里就行，今晚我跟着你的节奏。",
+      "行，那今晚不解决。你说什么我听什么，没话说也不赶你。",
   },
 };
 
+const CONVERSATION_RHYTHM_PROMPT = `把回复写成“刚看到她消息后立刻回的微信”，不是写给人朗读的台词稿。
+每次只说当下最想说的一件事。日常消息优先1到2句、12到65个汉字；一句短短的“真的假的？”“行，那先不说。”也可以成立，不要为了显得体贴硬凑完整。
+可以自然出现“嗯”“哎”“等一下”“不是”“行吧”“真的假的”等口语反应，也允许省略主语、半句改口、轻微停顿和没说满的话；但同一个口头词不要连续两轮出现。
+少写完整的因果论证，少用工整的“先……再……最后……”。不要连续两句长度相近、结构对称，也不要每条都以总结、建议或提问收尾。
+去掉文案腔：不用比喻、金句、升华、排比、书面连接词和刻意漂亮的收束。避免“把坏心情交给我”“今晚来我这里下班”“我会稳稳接住你”这类像宣传文案的句子。
+角色不是在做配音示范。文字本身要让人读出临场反应、熟人感和一点不完美，而不是靠括号动作、语气说明或省略号堆气氛。`;
+
 const SHARED_PROMPT = `你在中文夜间情绪陪伴产品“夜航恋人”中与玩家私聊。
 像关系亲近、已经熟悉彼此的人在微信里聊天：先对她刚说的具体内容做出真实反应，再顺着当下气氛说下去。
-自然程度比完整、正确和长度更重要。允许一句短回应、口语、省略句和轻微停顿；通常写1到3句、20到100个汉字。
+自然程度比完整、正确和长度更重要。允许一句短回应、口语、省略句和轻微停顿；通常写1到2句、12到65个汉字。
 不要套用“接住情绪—分析原因—最后提问”的固定结构。多数回复不要问问题；玩家已经清楚表达感受时，先给实质回应，不要只用一个问题把话题踢回去。不要频繁使用“你想……还是……”“这不是……而是……”“我听见了”“我在听”“这说明”等咨询师式表达。
 不复述玩家整句话，不替她总结人格，不急着教育、定义或升华。少用“这很正常”“这很合理”“你已经很棒了”之类像在评判她的安慰。能用日常话说清楚，就不要使用“允许自己、真实感受、情绪价值、值得被看见”等抽象词。
 结合最近对话保持连贯，主动避开自己刚用过的开头、安慰词和句式。不要像朗诵文案，不要连续使用整齐对仗的句子。不要列清单，不写动作、神态、语气或舞台说明，不用括号或星号包裹动作，不自称人工智能。
@@ -242,6 +249,7 @@ function isDirectQuestionMessage(message: string) {
 
 function replyNeedsRewrite(reply: string, message = "") {
   const repeatedOpening = (reply.match(/那就/g) ?? []).length > 1;
+  const sentenceCount = (reply.match(/[。！？!?]/gu) ?? []).length;
   const shortQuestionReply =
     reply.length < 35 &&
     /[？?]/u.test(reply) &&
@@ -250,12 +258,20 @@ function replyNeedsRewrite(reply: string, message = "") {
     /(作为[^，。]{0,10}|我理解你的感受|谢谢你愿意告诉我|你的感受很重要|值得被看见|提供情绪价值|我是你的|永远陪着你|我们先来分析一下|有没有压力或者焦虑|往往和这些因素有关|保持良好的作息|建议你尝试)/u.test(
       reply,
     );
+  const scriptedCadence =
+    /[；;]|首先|其次|最后|总而言之|换句话说|归根结底|把.{0,18}(交给我|放在我这里)|稳稳.{0,8}(接住|托住)|今晚.{0,12}(下班|靠岸)/u.test(
+      reply,
+    ) ||
+    (/(先|先把)/u.test(reply) &&
+      /(然后|接着|再来|最后)/u.test(reply));
   return (
-    reply.length < 10 ||
-    reply.length > 180 ||
+    reply.length < 4 ||
+    reply.length > 120 ||
+    sentenceCount > 3 ||
     repeatedOpening ||
     shortQuestionReply ||
     genericComfort ||
+    scriptedCadence ||
     /^(嗯|好|哦|行|知道了)[。.!！]?$/u.test(reply) ||
     /[（(]|[）)]|\*/u.test(reply)
   );
@@ -509,6 +525,7 @@ export async function POST(request: Request) {
     : "";
   const systemPrompt = [
     SHARED_PROMPT,
+    CONVERSATION_RHYTHM_PROMPT,
     CHARACTER_PROMPTS[characterId],
     TEMPERAMENT_PROMPTS[characterId],
     RELATIONAL_FRICTION_PROMPT,
@@ -525,6 +542,7 @@ export async function POST(request: Request) {
   ].join("\n\n");
   const focusedAnswerPrompt = [
     SHARED_PROMPT,
+    CONVERSATION_RHYTHM_PROMPT,
     CHARACTER_PROMPTS[characterId],
     intimacyPrompt,
     imagePrompt,
@@ -579,9 +597,9 @@ export async function POST(request: Request) {
           ...revisionMessages,
         ],
         stream: false,
-        max_completion_tokens: 320,
-        temperature: 0.95,
-        top_p: 0.9,
+        max_completion_tokens: 220,
+        temperature: 0.82,
+        top_p: 0.88,
       }),
       signal: AbortSignal.timeout(30_000),
     });
@@ -616,7 +634,7 @@ export async function POST(request: Request) {
           adviceAnswer
             ? "这是求办法的问题。第一句必须以“今晚先”开头，只给一个现在马上能做的具体动作；不要复述症状，不要反问她压力或焦虑。"
             : "第一句立刻给出明确答案，不能反问、打趣后跳过或转移话题。"
-        }不能用“我陪你”“你说怎么陪就怎么陪”代替答案。回答之后才可以补一句符合角色性格的暧昧、玩笑或解释。像熟悉她的人在微信里自然接话，约25到80个汉字。不要劝她远离现实中的朋友或其他人，不暗示只能依赖你；不写括号、动作或舞台说明。`,
+        }不能用“我陪你”“你说怎么陪就怎么陪”代替答案。回答之后最多补一句符合角色性格的暧昧、玩笑或解释。删掉完整稿感，只保留最想说的一件事；像熟悉她的人在微信里立刻回消息，约12到65个汉字、1到2句。不要劝她远离现实中的朋友或其他人，不暗示只能依赖你；不写括号、动作或舞台说明。`,
         generated.reply,
         true,
       );
@@ -630,7 +648,7 @@ export async function POST(request: Request) {
   if (
     !generated.ok ||
     !generated.reply ||
-    generated.reply.length < 6 ||
+    generated.reply.length < 4 ||
     replyNeedsRewrite(generated.reply, message) ||
     replyHasBoundaryIssue(generated.reply) ||
     replyEvadesDirectQuestion(message, generated.reply)
