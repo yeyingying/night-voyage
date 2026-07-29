@@ -444,6 +444,8 @@ const INTIMACY_ENABLED_KEY = "night-voyage-intimacy-enabled";
 const PROACTIVE_ENABLED_KEY = "night-voyage-proactive-enabled";
 const PROACTIVE_STATE_KEY = "night-voyage-proactive-state";
 const CHAT_HISTORY_KEY = "night-voyage-chat-history";
+const CHAT_HISTORY_LIMIT = 80;
+const CHAT_HISTORY_SYNC_DELAY = 450;
 const PROACTIVE_FIRST_MINUTES = [90, 150] as const;
 const PROACTIVE_FOLLOWUP_MINUTES = [240, 360] as const;
 const PROACTIVE_DAILY_LIMIT = 3;
@@ -534,6 +536,134 @@ function initialMessages(profile: CharacterProfile): Message[] {
       time: "",
     },
   ];
+}
+
+type ChatHistory = Record<CharacterId, Message[]>;
+
+function storableChatHistory(history: ChatHistory): ChatHistory {
+  return Object.fromEntries(
+    CHARACTER_IDS.map((id) => [
+      id,
+      (history[id] ?? []).slice(-CHAT_HISTORY_LIMIT).map((message) => ({
+        ...message,
+        kind:
+          message.kind === "voice" || message.kind === "image"
+            ? "text"
+            : message.kind,
+        audioUrl: undefined,
+        imageUrl: undefined,
+      })),
+    ]),
+  ) as ChatHistory;
+}
+
+function validStoredMessage(value: unknown): Message | null {
+  if (!value || typeof value !== "object") return null;
+  const message = value as Partial<Message>;
+  if (
+    typeof message.id !== "number" ||
+    !Number.isFinite(message.id) ||
+    !["companion", "user", "system"].includes(message.role ?? "") ||
+    typeof message.text !== "string" ||
+    !message.text.trim() ||
+    typeof message.time !== "string"
+  ) {
+    return null;
+  }
+  return {
+    id: message.id,
+    role: message.role as Message["role"],
+    text: message.text.trim().slice(0, 4000),
+    time: message.time.slice(0, 24),
+    sentAt:
+      typeof message.sentAt === "number" && Number.isFinite(message.sentAt)
+        ? message.sentAt
+        : undefined,
+    kind: message.kind === "proactive" ? "proactive" : "text",
+    imageName:
+      typeof message.imageName === "string"
+        ? message.imageName.slice(0, 240)
+        : undefined,
+    duration:
+      typeof message.duration === "number" && Number.isFinite(message.duration)
+        ? Math.max(1, Math.min(60, Math.round(message.duration)))
+        : undefined,
+  };
+}
+
+function restoredChatHistory(value: unknown): ChatHistory | null {
+  if (!value || typeof value !== "object") return null;
+  const stored = value as Record<string, unknown>;
+  return Object.fromEntries(
+    CHARACTER_IDS.map((id) => {
+      const messages = Array.isArray(stored[id])
+        ? stored[id]
+            .map(validStoredMessage)
+            .filter((message): message is Message => Boolean(message))
+            .slice(-CHAT_HISTORY_LIMIT)
+        : [];
+      return [
+        id,
+        messages.length ? messages : initialMessages(CHARACTERS[id]),
+      ];
+    }),
+  ) as ChatHistory;
+}
+
+function latestMessageAt(messages: Message[]) {
+  return messages.reduce(
+    (latest, message) =>
+      Math.max(latest, message.sentAt ?? message.id ?? 0),
+    0,
+  );
+}
+
+function mergeChatHistories(
+  localHistory: ChatHistory,
+  remoteHistory: ChatHistory,
+): ChatHistory {
+  return Object.fromEntries(
+    CHARACTER_IDS.map((id) => {
+      const local = localHistory[id] ?? [];
+      const remote = remoteHistory[id] ?? [];
+      const localLatest = latestMessageAt(local);
+      const remoteLatest = latestMessageAt(remote);
+      const chosen =
+        localLatest > remoteLatest ||
+        (localLatest === remoteLatest && local.length > remote.length)
+          ? local
+          : remote;
+      return [
+        id,
+        chosen.length ? chosen.slice(-CHAT_HISTORY_LIMIT) : initialMessages(CHARACTERS[id]),
+      ];
+    }),
+  ) as ChatHistory;
+}
+
+function persistLocalChatHistory(history: ChatHistory) {
+  try {
+    window.localStorage.setItem(
+      CHAT_HISTORY_KEY,
+      JSON.stringify(storableChatHistory(history)),
+    );
+  } catch (error) {
+    console.warn("Unable to save the local chat history.", error);
+  }
+}
+
+async function persistDurableChatHistory(
+  history: ChatHistory,
+  keepalive = false,
+) {
+  return fetch("/api/history", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ history: storableChatHistory(history) }),
+    credentials: "same-origin",
+    cache: "no-store",
+    keepalive,
+  });
 }
 
 function nowTime() {
@@ -629,6 +759,7 @@ export default function Home() {
         CHARACTER_IDS.map((id) => [id, initialMessages(CHARACTERS[id])]),
       ) as Record<CharacterId, Message[]>,
   );
+  const messagesByCharacterRef = useRef(messagesByCharacter);
   const [memories, setMemories] = useState<Memory[]>(INITIAL_MEMORIES);
   const [input, setInput] = useState("");
   const [sleepOpen, setSleepOpen] = useState(false);
@@ -660,6 +791,7 @@ export default function Home() {
     useState<AdultGateIntent>("intimacy");
   const [proactiveEnabled, setProactiveEnabled] = useState(true);
   const [localStateHydrated, setLocalStateHydrated] = useState(false);
+  const [durableHistoryHydrated, setDurableHistoryHydrated] = useState(false);
   const [clockNow, setClockNow] = useState(0);
   const [personaStates, setPersonaStates] =
     useState<PersonaStateByCharacter>({});
@@ -687,6 +819,8 @@ export default function Home() {
   const voiceRecordingStartedAtRef = useRef(0);
   const voiceTimerRef = useRef<number | null>(null);
   const voiceNoticeTimerRef = useRef<number | null>(null);
+  const historySyncTimerRef = useRef<number | null>(null);
+  const durableHistoryAvailableRef = useRef(false);
   const voicePressActiveRef = useRef(false);
   const voiceSessionActiveRef = useRef(false);
   const voiceCancelIntentRef = useRef(false);
@@ -845,18 +979,13 @@ export default function Home() {
       }
       if (savedChatHistory) {
         try {
-          const parsed = JSON.parse(savedChatHistory) as Partial<
-            Record<CharacterId, Message[]>
-          >;
-          const restored = Object.fromEntries(
-            CHARACTER_IDS.map((id) => [
-              id,
-              Array.isArray(parsed[id]) && parsed[id]?.length
-                ? parsed[id]
-                : initialMessages(CHARACTERS[id]),
-            ]),
-          ) as Record<CharacterId, Message[]>;
-          setMessagesByCharacter(restored);
+          const restored = restoredChatHistory(
+            JSON.parse(savedChatHistory),
+          );
+          if (restored) {
+            messagesByCharacterRef.current = restored;
+            setMessagesByCharacter(restored);
+          }
         } catch {
           window.localStorage.removeItem(CHAT_HISTORY_KEY);
         }
@@ -868,6 +997,47 @@ export default function Home() {
     }, 0);
     return () => window.clearTimeout(hydrateLocalState);
   }, []);
+
+  useEffect(() => {
+    if (!localStateHydrated) return;
+    const controller = new AbortController();
+
+    async function restoreDurableHistory() {
+      try {
+        const response = await fetch("/api/history", {
+          credentials: "same-origin",
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const result = (await response.json()) as {
+          history?: unknown;
+          durable?: boolean;
+        };
+        if (controller.signal.aborted) return;
+        durableHistoryAvailableRef.current =
+          response.ok && result.durable === true;
+        const remote = restoredChatHistory(result.history);
+        if (remote) {
+          const merged = mergeChatHistories(
+            messagesByCharacterRef.current,
+            remote,
+          );
+          messagesByCharacterRef.current = merged;
+          setMessagesByCharacter(merged);
+          persistLocalChatHistory(merged);
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.warn("Unable to restore durable chat history.", error);
+        }
+      } finally {
+        if (!controller.signal.aborted) setDurableHistoryHydrated(true);
+      }
+    }
+
+    void restoreDurableHistory();
+    return () => controller.abort();
+  }, [localStateHydrated]);
 
   useEffect(() => {
     const initialTick = window.setTimeout(() => setClockNow(Date.now()), 0);
@@ -950,25 +1120,60 @@ export default function Home() {
 
   useEffect(() => {
     if (!localStateHydrated) return;
-    const storableHistory = Object.fromEntries(
-      CHARACTER_IDS.map((id) => [
-        id,
-        messagesByCharacter[id].slice(-60).map((message) => ({
-          ...message,
-          kind:
-            message.kind === "voice" || message.kind === "image"
-              ? "text"
-              : message.kind,
-          audioUrl: undefined,
-          imageUrl: undefined,
-        })),
-      ]),
-    );
-    window.localStorage.setItem(
-      CHAT_HISTORY_KEY,
-      JSON.stringify(storableHistory),
-    );
-  }, [localStateHydrated, messagesByCharacter]);
+    messagesByCharacterRef.current = messagesByCharacter;
+    persistLocalChatHistory(messagesByCharacter);
+    if (
+      !durableHistoryHydrated ||
+      !durableHistoryAvailableRef.current
+    ) {
+      return;
+    }
+
+    if (historySyncTimerRef.current !== null) {
+      window.clearTimeout(historySyncTimerRef.current);
+    }
+    historySyncTimerRef.current = window.setTimeout(() => {
+      void persistDurableChatHistory(messagesByCharacterRef.current).catch(
+        (error) => {
+          console.warn("Unable to sync durable chat history.", error);
+        },
+      );
+      historySyncTimerRef.current = null;
+    }, CHAT_HISTORY_SYNC_DELAY);
+    return () => {
+      if (historySyncTimerRef.current !== null) {
+        window.clearTimeout(historySyncTimerRef.current);
+        historySyncTimerRef.current = null;
+      }
+    };
+  }, [
+    durableHistoryHydrated,
+    localStateHydrated,
+    messagesByCharacter,
+  ]);
+
+  useEffect(() => {
+    if (!localStateHydrated) return;
+
+    function flushChatHistory() {
+      const current = messagesByCharacterRef.current;
+      persistLocalChatHistory(current);
+      if (durableHistoryAvailableRef.current) {
+        void persistDurableChatHistory(current, true).catch(() => undefined);
+      }
+    }
+
+    function flushHiddenHistory() {
+      if (document.visibilityState === "hidden") flushChatHistory();
+    }
+
+    window.addEventListener("pagehide", flushChatHistory);
+    document.addEventListener("visibilitychange", flushHiddenHistory);
+    return () => {
+      window.removeEventListener("pagehide", flushChatHistory);
+      document.removeEventListener("visibilitychange", flushHiddenHistory);
+    };
+  }, [localStateHydrated]);
 
   useEffect(() => {
     if (!localStateHydrated) return;
@@ -1087,20 +1292,24 @@ export default function Home() {
           ? Math.floor(Math.random() * moments.length)
           : (current.lastMessageIndex + offset) % moments.length;
       const text = moments[messageIndex];
-      setMessagesByCharacter((existing) => ({
-        ...existing,
-        [current.characterId]: [
-          ...existing[current.characterId],
-          {
-            id: now,
-            role: "companion",
-            kind: "proactive",
-            text,
-            time: nowTime(),
-            sentAt: now,
-          },
-        ],
-      }));
+      setMessagesByCharacter((existing) => {
+        const next = {
+          ...existing,
+          [current.characterId]: [
+            ...existing[current.characterId],
+            {
+              id: now,
+              role: "companion" as const,
+              kind: "proactive" as const,
+              text,
+              time: nowTime(),
+              sentAt: now,
+            },
+          ],
+        };
+        messagesByCharacterRef.current = next;
+        return next;
+      });
 
       persistProactiveState({
         ...current,
@@ -1683,10 +1892,14 @@ export default function Home() {
     characterId: CharacterId,
     newMessages: Message[],
   ) {
-    setMessagesByCharacter((current) => ({
-      ...current,
-      [characterId]: [...current[characterId], ...newMessages],
-    }));
+    setMessagesByCharacter((current) => {
+      const next = {
+        ...current,
+        [characterId]: [...current[characterId], ...newMessages],
+      };
+      messagesByCharacterRef.current = next;
+      return next;
+    });
   }
 
   function saveProactiveState(nextState: ProactiveState) {

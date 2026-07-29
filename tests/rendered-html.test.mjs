@@ -9,16 +9,22 @@ async function productSources() {
     css,
     chatRoute,
     ttsRoute,
+    historyRoute,
     characterClock,
     personaEngine,
+    databaseSchema,
+    hostingConfig,
   ] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/api/chat/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/tts/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/history/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/character-clock.ts", import.meta.url), "utf8"),
     readFile(new URL("../lib/persona-engine.ts", import.meta.url), "utf8"),
+    readFile(new URL("../db/schema.ts", import.meta.url), "utf8"),
+    readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"),
   ]);
   return {
     page,
@@ -26,8 +32,11 @@ async function productSources() {
     css,
     chatRoute,
     ttsRoute,
+    historyRoute,
     characterClock,
     personaEngine,
+    databaseSchema,
+    hostingConfig,
   };
 }
 
@@ -163,4 +172,21 @@ test("answers the player's actual question instead of masking model failures", a
     page,
     /Dynamic reply unavailable; using fallback reply/,
   );
+});
+
+test("restores durable per-character chat history across sessions", async () => {
+  const { page, historyRoute, databaseSchema, hostingConfig } =
+    await productSources();
+
+  assert.match(hostingConfig, /"d1":\s*"DB"/);
+  assert.match(databaseSchema, /chatSessions/);
+  assert.match(databaseSchema, /sessionId/);
+  assert.match(historyRoute, /CREATE TABLE IF NOT EXISTS chat_sessions/);
+  assert.match(historyRoute, /night_voyage_session/);
+  assert.match(historyRoute, /ON CONFLICT\(session_id\) DO UPDATE/);
+  assert.match(historyRoute, /MAX_MESSAGES_PER_CHARACTER = 80/);
+  assert.match(page, /fetch\("\/api\/history"/);
+  assert.match(page, /mergeChatHistories/);
+  assert.match(page, /persistLocalChatHistory/);
+  assert.match(page, /window\.addEventListener\("pagehide"/);
 });
