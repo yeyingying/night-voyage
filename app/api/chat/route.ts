@@ -281,7 +281,7 @@ function replyEvadesDirectQuestion(message: string, reply: string) {
   const isAdviceQuestion =
     /(怎么办|应该怎么|该先做什么|怎么做|该不该)/u.test(message);
   if (isAdviceQuestion) {
-    return !/(先|现在先|今晚先|把.{0,20}(放|写|关|调|分)|别|停|试着|只做|起来|离开床|呼气|记录)/u.test(
+    return !/(先|现在先|今晚先|可以先|把.{0,20}(放|写|关|调|分)|别|不要|停|试着|试试|只做|起来|离开床|关掉|放下|闭眼|坐起来|呼吸|呼气|喝|听|数|记录)/u.test(
       reply,
     );
   }
@@ -599,6 +599,9 @@ export async function POST(request: Request) {
   let generated: Awaited<ReturnType<typeof generate>>;
   try {
     const focusedAnswer = isDirectQuestionMessage(message);
+    const adviceAnswer = /(怎么办|应该怎么|该先做什么|怎么做|该不该)/u.test(
+      message,
+    );
     generated = await generate("", "", focusedAnswer);
     for (let rewriteAttempt = 0; rewriteAttempt < 2; rewriteAttempt += 1) {
       const needsRewrite =
@@ -609,7 +612,11 @@ export async function POST(request: Request) {
       if (!needsRewrite) break;
 
       const rewritten = await generate(
-        `玩家刚才真正问的是：“${message.slice(0, 180)}”。上一版没有正面回答，必须重写。第一句立刻给出明确答案，不能反问、打趣后跳过、转移话题，也不能用“我陪你”“你说怎么陪就怎么陪”代替答案。回答之后才可以补一句符合角色性格的暧昧、玩笑或解释。像熟悉她的人在微信里自然接话，约25到80个汉字。不要劝她远离现实中的朋友或其他人，不暗示只能依赖你；不写括号、动作或舞台说明。`,
+        `玩家刚才真正问的是：“${message.slice(0, 180)}”。上一版没有正面回答，必须重写。${
+          adviceAnswer
+            ? "这是求办法的问题。第一句必须以“今晚先”开头，只给一个现在马上能做的具体动作；不要复述症状，不要反问她压力或焦虑。"
+            : "第一句立刻给出明确答案，不能反问、打趣后跳过或转移话题。"
+        }不能用“我陪你”“你说怎么陪就怎么陪”代替答案。回答之后才可以补一句符合角色性格的暧昧、玩笑或解释。像熟悉她的人在微信里自然接话，约25到80个汉字。不要劝她远离现实中的朋友或其他人，不暗示只能依赖你；不写括号、动作或舞台说明。`,
         generated.reply,
         true,
       );
