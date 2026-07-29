@@ -77,6 +77,14 @@ type VoicePerformance = {
   pauseSeconds: number;
 };
 
+type VoiceDeliveryProfile = {
+  openingBeat: number;
+  clauseBeat: number;
+  sentenceBeat: number;
+  brightCueChance: number;
+  flusteredCueChance: number;
+};
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DAILY_BOND_CAP = 5;
 
@@ -521,35 +529,35 @@ function conversationalVoice(
       pitchDelta: pitch + 1,
       volume: Math.max(0.9, volume - 0.02),
       emotion: "calm",
-      pauseSeconds: pause + 0.08,
+      pauseSeconds: pause + 0.04,
     },
     concerned: {
-      speedDelta: speed - 0.07,
+      speedDelta: speed - 0.04,
       pitchDelta: pitch - 1,
       volume: Math.max(0.88, volume - 0.05),
       emotion: "calm",
-      pauseSeconds: pause + 0.1,
+      pauseSeconds: pause + 0.05,
     },
     irritated: {
-      speedDelta: speed - 0.03,
+      speedDelta: speed - 0.01,
       pitchDelta: pitch,
       volume: Math.max(0.9, volume - 0.01),
       emotion: "calm",
-      pauseSeconds: pause + 0.09,
+      pauseSeconds: pause + 0.04,
     },
     guarded: {
-      speedDelta: speed - 0.04,
+      speedDelta: speed - 0.02,
       pitchDelta: pitch - 1,
       volume: Math.max(0.88, volume - 0.03),
       emotion: "calm",
-      pauseSeconds: pause + 0.11,
+      pauseSeconds: pause + 0.05,
     },
     soft: {
-      speedDelta: speed - 0.08,
+      speedDelta: speed - 0.03,
       pitchDelta: pitch - 1,
       volume: Math.max(0.86, volume - 0.07),
       emotion: "calm",
-      pauseSeconds: pause + 0.13,
+      pauseSeconds: pause + 0.06,
     },
   };
 }
@@ -558,7 +566,7 @@ export const VOICE_PERFORMANCES: Record<
   CharacterId,
   Record<PersonaVoiceMood, VoicePerformance>
 > = {
-  pei: conversationalVoice(-0.01, 0, 0.97, 0.14),
+  pei: conversationalVoice(0.03, 0, 0.97, 0.12),
   chi: {
     composed: {
       speedDelta: 0,
@@ -579,35 +587,35 @@ export const VOICE_PERFORMANCES: Record<
       pitchDelta: 1,
       volume: 0.98,
       emotion: "calm",
-      pauseSeconds: 0.18,
+      pauseSeconds: 0.14,
     },
     concerned: {
-      speedDelta: -0.08,
+      speedDelta: -0.04,
       pitchDelta: -1,
       volume: 0.94,
       emotion: "calm",
-      pauseSeconds: 0.22,
+      pauseSeconds: 0.17,
     },
     irritated: {
-      speedDelta: -0.03,
+      speedDelta: -0.01,
       pitchDelta: 0,
       volume: 0.98,
       emotion: "calm",
-      pauseSeconds: 0.2,
+      pauseSeconds: 0.16,
     },
     guarded: {
-      speedDelta: -0.02,
+      speedDelta: -0.01,
       pitchDelta: 0,
       volume: 0.97,
       emotion: "calm",
-      pauseSeconds: 0.17,
+      pauseSeconds: 0.15,
     },
     soft: {
-      speedDelta: -0.07,
+      speedDelta: -0.04,
       pitchDelta: -1,
       volume: 0.92,
       emotion: "calm",
-      pauseSeconds: 0.24,
+      pauseSeconds: 0.16,
     },
   },
   yan: {
@@ -619,53 +627,112 @@ export const VOICE_PERFORMANCES: Record<
       pauseSeconds: 0.16,
     },
     bright: {
-      speedDelta: 0.01,
+      speedDelta: 0.02,
       pitchDelta: 0,
       volume: 0.99,
       emotion: "happy",
-      pauseSeconds: 0.14,
+      pauseSeconds: 0.12,
     },
     flustered: {
-      speedDelta: -0.04,
+      speedDelta: -0.01,
       pitchDelta: 0,
       volume: 0.96,
       emotion: "calm",
-      pauseSeconds: 0.24,
+      pauseSeconds: 0.18,
     },
     concerned: {
-      speedDelta: 0.03,
+      speedDelta: 0,
       pitchDelta: 0,
       volume: 1,
       emotion: "calm",
       pauseSeconds: 0.12,
     },
     irritated: {
-      speedDelta: -0.09,
+      speedDelta: -0.03,
       pitchDelta: -1,
       volume: 0.95,
       emotion: "calm",
-      pauseSeconds: 0.3,
+      pauseSeconds: 0.2,
     },
     guarded: {
-      speedDelta: -0.05,
+      speedDelta: -0.02,
       pitchDelta: -1,
       volume: 0.94,
       emotion: "calm",
-      pauseSeconds: 0.26,
+      pauseSeconds: 0.18,
     },
     soft: {
-      speedDelta: -0.08,
+      speedDelta: -0.03,
       pitchDelta: -1,
       volume: 0.91,
       emotion: "calm",
-      pauseSeconds: 0.28,
+      pauseSeconds: 0.19,
     },
   },
-  lu: conversationalVoice(-0.03, 0, 0.93, 0.18),
-  cheng: conversationalVoice(0, 0, 0.97, 0.13),
-  qi: conversationalVoice(-0.01, -1, 0.99, 0.14),
+  lu: conversationalVoice(0.02, 0, 0.93, 0.13),
+  cheng: conversationalVoice(0.02, 0, 0.97, 0.12),
+  qi: conversationalVoice(0.02, -1, 0.99, 0.12),
   shen: conversationalVoice(0.01, 0, 0.96, 0.12),
-  xu: conversationalVoice(0.03, 1, 1, 0.11),
+  xu: conversationalVoice(0.02, 1, 1, 0.1),
+};
+
+const VOICE_DELIVERY_PROFILES: Record<CharacterId, VoiceDeliveryProfile> = {
+  pei: {
+    openingBeat: 0.09,
+    clauseBeat: 0.12,
+    sentenceBeat: 0.19,
+    brightCueChance: 14,
+    flusteredCueChance: 18,
+  },
+  chi: {
+    openingBeat: 0.06,
+    clauseBeat: 0.09,
+    sentenceBeat: 0.15,
+    brightCueChance: 38,
+    flusteredCueChance: 30,
+  },
+  yan: {
+    openingBeat: 0.11,
+    clauseBeat: 0.15,
+    sentenceBeat: 0.22,
+    brightCueChance: 10,
+    flusteredCueChance: 14,
+  },
+  lu: {
+    openingBeat: 0.08,
+    clauseBeat: 0.11,
+    sentenceBeat: 0.18,
+    brightCueChance: 16,
+    flusteredCueChance: 18,
+  },
+  cheng: {
+    openingBeat: 0.07,
+    clauseBeat: 0.1,
+    sentenceBeat: 0.17,
+    brightCueChance: 28,
+    flusteredCueChance: 20,
+  },
+  qi: {
+    openingBeat: 0.07,
+    clauseBeat: 0.1,
+    sentenceBeat: 0.16,
+    brightCueChance: 12,
+    flusteredCueChance: 12,
+  },
+  shen: {
+    openingBeat: 0.08,
+    clauseBeat: 0.11,
+    sentenceBeat: 0.17,
+    brightCueChance: 18,
+    flusteredCueChance: 16,
+  },
+  xu: {
+    openingBeat: 0.05,
+    clauseBeat: 0.08,
+    sentenceBeat: 0.14,
+    brightCueChance: 40,
+    flusteredCueChance: 32,
+  },
 };
 
 export function isPilotCharacter(
@@ -912,25 +979,71 @@ export function applyVoiceBreak(
   characterId: CharacterId,
   mood: PersonaVoiceMood,
 ) {
-  const performance = VOICE_PERFORMANCES[characterId][mood];
-  const shortPause = Math.max(0.08, performance.pauseSeconds - 0.04);
-  const longPause = Math.min(0.36, performance.pauseSeconds + 0.09);
-  const shortTag = `<#${shortPause.toFixed(2)}#>`;
-  const regularTag = `<#${performance.pauseSeconds.toFixed(2)}#>`;
-  const longTag = `<#${longPause.toFixed(2)}#>`;
+  const profile = VOICE_DELIVERY_PROFILES[characterId];
+  const variant = stableSpeechVariant(`${characterId}:${mood}:${text}`);
+  const jitter = ((variant % 7) - 3) * 0.006;
+  const tag = (seconds: number) =>
+    `<#${Math.max(0.05, Math.min(0.3, seconds + jitter)).toFixed(2)}#>`;
+  const openingTag = tag(profile.openingBeat);
+  const clauseTag = tag(profile.clauseBeat);
+  const sentenceTag = tag(profile.sentenceBeat);
+  const hesitationTag = tag(profile.openingBeat + 0.03);
+  const cleanText = text
+    .replace(/<#\d+(?:\.\d+)?#>/gu, "")
+    .replace(/[ \t]+/gu, " ")
+    .trim();
 
-  return text
+  let performedText = cleanText
     .replace(
-      /^(嗯|唔|诶|欸|哎|等一下|不是|行吧|好吧)([，,])/u,
-      (_match, word: string, mark: string) => `${word}${mark}${shortTag}`,
+      /^(嗯|唔|诶|欸|哎|哎呀|等一下|真的假的|不是|行吧|好吧|对了)([，,：:]?)/u,
+      (_match, word: string, mark: string) =>
+        `${word}${mark || "，"}${openingTag}`,
     )
     .replace(
-      /([，,])(?=[^，,。！？!?]{4,})/u,
-      (mark) => `${mark}${regularTag}`,
+      /^([^，,。！？!?\n]{4,16})([，,])(?=[^，,。！？!?\n]{5,})/u,
+      (_match, phrase: string, mark: string) =>
+        `${phrase}${mark}${clauseTag}`,
     )
-    .replace(/(……|\.{3,})/u, (mark) => `${mark}${longTag}`)
+    .replace(/(……|\.{3,})/u, (mark) => `${mark}${hesitationTag}`)
     .replace(
-      /([。！？!?])(?=.)/u,
-      (mark) => `${mark}${longTag}`,
+      /([。！？!?])\s*(?=.)/gu,
+      (_match, mark: string) => `${mark}${sentenceTag}\n`,
     );
+
+  const cue = conversationalSoundCue(
+    characterId,
+    mood,
+    variant,
+    profile,
+  );
+  if (cue) performedText = `${cue}${openingTag}${performedText}`;
+
+  return performedText;
+}
+
+function stableSpeechVariant(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function conversationalSoundCue(
+  characterId: CharacterId,
+  mood: PersonaVoiceMood,
+  variant: number,
+  profile: VoiceDeliveryProfile,
+) {
+  const roll = variant % 100;
+  if (mood === "bright" && roll < profile.brightCueChance) {
+    return characterId === "chi" || characterId === "xu"
+      ? "(chuckle)"
+      : "(laughs)";
+  }
+  if (mood === "flustered" && roll < profile.flusteredCueChance) {
+    return "(emm)";
+  }
+  return "";
 }

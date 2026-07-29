@@ -168,7 +168,12 @@ test("keeps chat copy and all character voices conversational", async () => {
   assert.match(personaEngine, /qi:\s*conversationalVoice/);
   assert.match(personaEngine, /shen:\s*conversationalVoice/);
   assert.match(personaEngine, /xu:\s*conversationalVoice/);
-  assert.match(personaEngine, /const longTag =/);
+  assert.match(personaEngine, /VOICE_DELIVERY_PROFILES/);
+  assert.match(personaEngine, /stableSpeechVariant/);
+  assert.match(personaEngine, /conversationalSoundCue/);
+  assert.match(personaEngine, /\(chuckle\)/);
+  assert.match(personaEngine, /\(emm\)/);
+  assert.match(personaEngine, /sentenceTag.*\\n/);
   assert.doesNotMatch(
     personaEngine,
     /if \(!isPilotCharacter\(characterId\)\) return "composed"/,
@@ -177,6 +182,7 @@ test("keeps chat copy and all character voices conversational", async () => {
     ttsRoute,
     /scene === "chat" \? VOICE_PERFORMANCES\[characterId\]\[voiceMood\]/,
   );
+  assert.match(ttsRoute, /: "speech-2\.8-turbo"/);
   assert.match(
     page,
     /!sleepVoice \? VOICE_PERFORMANCES\[character\.id\]\[voiceMood\]/,
