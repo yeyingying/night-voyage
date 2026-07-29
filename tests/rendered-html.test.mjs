@@ -148,10 +148,13 @@ test("answers the player's actual question instead of masking model failures", a
   assert.match(chatRoute, /DIRECT_ANSWER_PROMPT/);
   assert.match(chatRoute, /第一句必须先回答那个问题/);
   assert.match(chatRoute, /replyEvadesDirectQuestion/);
+  assert.match(chatRoute, /focusedAnswerPrompt/);
+  assert.match(chatRoute, /isDirectQuestionMessage/);
   assert.match(chatRoute, /rewriteAttempt < 2/);
   assert.match(chatRoute, /上一版没有正面回答/);
   assert.match(chatRoute, /喜欢你\|不喜欢/);
   assert.match(chatRoute, /我们先来分析一下/);
+  assert.match(chatRoute, /isAdviceQuestion/);
   assert.match(chatRoute, /const chatPath = "\/v1\/chat\/completions"/);
   assert.match(page, /这条问题还没回答/);
   assert.match(page, /不会拿预设话术敷衍你/);

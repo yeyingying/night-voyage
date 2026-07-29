@@ -230,6 +230,16 @@ function cleanReply(content: string) {
     .trim();
 }
 
+function isDirectQuestionMessage(message: string) {
+  return (
+    /[？?吗么]/u.test(message) ||
+    /^(谁|什么|为什么|怎么|怎样|哪|几|多少|是不是|有没有|能不能|会不会)/u.test(
+      message,
+    ) ||
+    /(怎么办|应该怎么|该先做什么|怎么做|该不该|怎么看)/u.test(message)
+  );
+}
+
 function replyNeedsRewrite(reply: string, message = "") {
   const repeatedOpening = (reply.match(/那就/g) ?? []).length > 1;
   const shortQuestionReply =
@@ -258,17 +268,20 @@ function replyHasBoundaryIssue(reply: string) {
 }
 
 function replyEvadesDirectQuestion(message: string, reply: string) {
-  const isQuestion =
-    /[？?吗么]/u.test(message) ||
-    /^(谁|什么|为什么|怎么|怎样|哪|几|多少|是不是|有没有|能不能|会不会)/u.test(
-      message,
-    );
-  if (!isQuestion) return false;
+  if (!isDirectQuestionMessage(message)) return false;
 
   const isRelationshipQuestion =
     /(喜欢|爱|心动|在意|想我|想你|喜欢的人|有没有人)/u.test(message);
   if (isRelationshipQuestion) {
     return !/(有|没有|没|喜欢你|不喜欢|爱你|心动|在意|想你|想我|算|是你|当然)/u.test(
+      reply,
+    );
+  }
+
+  const isAdviceQuestion =
+    /(怎么办|应该怎么|该先做什么|怎么做|该不该)/u.test(message);
+  if (isAdviceQuestion) {
+    return !/(先|现在先|今晚先|把.{0,20}(放|写|关|调|分)|别|停|试着|只做|起来|离开床|呼气|记录)/u.test(
       reply,
     );
   }
@@ -510,6 +523,17 @@ export async function POST(request: Request) {
     samplePrompt,
     ADAPTIVE_EXAMPLES,
   ].join("\n\n");
+  const focusedAnswerPrompt = [
+    SHARED_PROMPT,
+    CHARACTER_PROMPTS[characterId],
+    intimacyPrompt,
+    imagePrompt,
+    DIRECT_ANSWER_PROMPT,
+    ADAPTIVE_PROMPT,
+    timelinePrompt,
+    personaPrompt,
+    memoryPrompt,
+  ].join("\n\n");
 
   const apiBase =
     runtime.MINIMAX_API_BASE?.trim().replace(/\/$/, "") ??
@@ -518,10 +542,15 @@ export async function POST(request: Request) {
 
   const chatPath = "/v1/chat/completions";
 
-  async function generate(extraInstruction = "", rejectedDraft = "") {
+  async function generate(
+    extraInstruction = "",
+    rejectedDraft = "",
+    focusedAnswer = false,
+  ) {
+    const basePrompt = focusedAnswer ? focusedAnswerPrompt : systemPrompt;
     const prompt = extraInstruction
-      ? `${systemPrompt}\n\n${extraInstruction}`
-      : systemPrompt;
+      ? `${basePrompt}\n\n${extraInstruction}`
+      : basePrompt;
     const revisionMessages = rejectedDraft
       ? [
           { role: "assistant", content: rejectedDraft },
@@ -569,7 +598,8 @@ export async function POST(request: Request) {
 
   let generated: Awaited<ReturnType<typeof generate>>;
   try {
-    generated = await generate();
+    const focusedAnswer = isDirectQuestionMessage(message);
+    generated = await generate("", "", focusedAnswer);
     for (let rewriteAttempt = 0; rewriteAttempt < 2; rewriteAttempt += 1) {
       const needsRewrite =
         generated.ok &&
@@ -581,6 +611,7 @@ export async function POST(request: Request) {
       const rewritten = await generate(
         `玩家刚才真正问的是：“${message.slice(0, 180)}”。上一版没有正面回答，必须重写。第一句立刻给出明确答案，不能反问、打趣后跳过、转移话题，也不能用“我陪你”“你说怎么陪就怎么陪”代替答案。回答之后才可以补一句符合角色性格的暧昧、玩笑或解释。像熟悉她的人在微信里自然接话，约25到80个汉字。不要劝她远离现实中的朋友或其他人，不暗示只能依赖你；不写括号、动作或舞台说明。`,
         generated.reply,
+        true,
       );
       generated = rewritten;
     }
