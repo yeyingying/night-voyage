@@ -237,7 +237,7 @@ function replyNeedsRewrite(reply: string, message = "") {
     /[？?]/u.test(reply) &&
     (!message || replyEvadesDirectQuestion(message, reply));
   const genericComfort =
-    /(作为[^，。]{0,10}|我理解你的感受|谢谢你愿意告诉我|你的感受很重要|值得被看见|提供情绪价值|我是你的|永远陪着你)/u.test(
+    /(作为[^，。]{0,10}|我理解你的感受|谢谢你愿意告诉我|你的感受很重要|值得被看见|提供情绪价值|我是你的|永远陪着你|我们先来分析一下|有没有压力或者焦虑|往往和这些因素有关|保持良好的作息|建议你尝试)/u.test(
       reply,
     );
   return (
@@ -268,7 +268,7 @@ function replyEvadesDirectQuestion(message: string, reply: string) {
   const isRelationshipQuestion =
     /(喜欢|爱|心动|在意|想我|想你|喜欢的人|有没有人)/u.test(message);
   if (isRelationshipQuestion) {
-    return !/(有|没有|没|喜欢|不喜欢|爱|心动|在意|想你|想我|算|是你)/u.test(
+    return !/(有|没有|没|喜欢你|不喜欢|爱你|心动|在意|想你|想我|算|是你|当然)/u.test(
       reply,
     );
   }

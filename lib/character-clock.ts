@@ -44,8 +44,8 @@ export type CharacterWorldSnapshot = {
 
 const m = (hour: number, minute = 0) => hour * 60 + minute;
 
-const NIGHT_COMPANION_START = m(22);
-const NIGHT_COMPANION_END = m(2, 30);
+const NIGHT_COMPANION_START = m(20);
+const NIGHT_COMPANION_END = m(8);
 
 const NIGHT_COMPANION_BLOCKS: Record<
   CharacterClockId,
@@ -322,8 +322,8 @@ function getNightCompanionSnapshot(
     endsAt.setDate(endsAt.getDate() + 1);
   }
 
-  startedAt.setHours(22, 0, 0, 0);
-  endsAt.setHours(2, 30, 0, 0);
+  startedAt.setHours(20, 0, 0, 0);
+  endsAt.setHours(8, 0, 0, 0);
 
   const nextSchedule = scheduleFor(characterId, endsAt);
   const nextBlock =

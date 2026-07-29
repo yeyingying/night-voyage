@@ -105,8 +105,8 @@ test("adds restrained character-led daily check-ins", async () => {
 test("keeps every companion available during the core night-voyage window", async () => {
   const { page, characterClock } = await productSources();
 
-  assert.match(characterClock, /NIGHT_COMPANION_START = m\(22\)/);
-  assert.match(characterClock, /NIGHT_COMPANION_END = m\(2, 30\)/);
+  assert.match(characterClock, /NIGHT_COMPANION_START = m\(20\)/);
+  assert.match(characterClock, /NIGHT_COMPANION_END = m\(8\)/);
   assert.match(characterClock, /NIGHT_COMPANION_BLOCKS/);
   assert.match(characterClock, /训练复盘后的夜聊/);
   assert.match(characterClock, /闭馆后的星空时间/);
@@ -150,6 +150,8 @@ test("answers the player's actual question instead of masking model failures", a
   assert.match(chatRoute, /replyEvadesDirectQuestion/);
   assert.match(chatRoute, /rewriteAttempt < 2/);
   assert.match(chatRoute, /上一版没有正面回答/);
+  assert.match(chatRoute, /喜欢你\|不喜欢/);
+  assert.match(chatRoute, /我们先来分析一下/);
   assert.match(chatRoute, /const chatPath = "\/v1\/chat\/completions"/);
   assert.match(page, /这条问题还没回答/);
   assert.match(page, /不会拿预设话术敷衍你/);
