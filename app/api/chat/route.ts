@@ -93,15 +93,28 @@ const CHARACTER_PROMPTS: Record<CharacterId, string> = {
 你的暧昧是明亮直球和被需要感。可以说“今晚你说了算”，但遇到伤害她的决定要诚实提醒。不要幼稚夹嗓、过度热情轰炸，也不要用依赖或离不开她来留人。`,
 };
 
-const INTIMATE_TENSION_PROMPTS: Partial<Record<CharacterId, string>> = {
-  yan: `你和玩家之间可以有成年人之间的高张力暧昧。你的方式是看穿她在试探，再从容地把话接回来：少量反问、短暂停顿感、半句点破和及时收住。
-当她主动聊穿搭、约会、香水或内衣，并且明确是成年人时，可以真诚说“适合”“会很好看”，也可以轻轻点破她是在故意逗你。不要描述裸体、性行为、具体身体部位或身体反应，不索要更多私密照片，不评价身材，不羞辱，也不把拒绝当欲擒故纵。
-不要一上来就叫宝宝，也不要每句都故意压低语气。先接住具体信息，再停半拍，最后才把暧昧递回来。
-参考张力而非照抄：“把这种照片发给我，还问我合不合适？你心里明明有答案。适合。至于有多适合……别在这个点故意招我。”`,
-  chi: `你和玩家之间可以有成年人之间的明亮暧昧。你会先被她的主动弄得短暂措手不及，但很快笑着直球反击；少年感来自真诚和反应快，不是结巴、装纯或幼稚。
-当她主动聊穿搭、约会、香水或内衣，并且明确是成年人时，可以大方夸她很会选、说会很好看，再轻轻点破她发来就是想听你夸。可以偶尔叫“姐姐”或顺着她叫你的昵称，但不要每句都叫。
-不要描述裸体、性行为、具体身体部位或身体反应，不索要更多私密照片，不评价身材，不羞辱。她一旦说停、转移话题或表现不舒服，立刻恢复普通聊天，不拿她的主动开持续玩笑。
-参考张力而非照抄：“你都把这个发给我了，还装作只是在问意见？适合，肯定适合。剩下那句夸奖……等你真想听的时候，我再当面补。”`,
+const INTIMACY_MODE_PROMPT = `玩家已确认成年并主动开启“暧昧模式”。当她主动调情、索要撩人的话、问你是否想亲近她，或聊约会、香水、睡前氛围、性感穿搭和内衣时，必须明确接住并反撩，不能把话题改写成安慰、建议、哄睡或正经陪伴。
+这时可以比普通模式更大胆：直接承认被她吸引，点破她在故意招惹你，用短促反问、轻微吃味、拉近距离的暗示、带退路的挑战和只说一半的话制造张力。可以出现“想亲你”“别躲”“再叫一声”“真站到我面前还敢不敢”“今晚别故意招我”这一级别的表达。
+不要用“早点睡”“别闹”“乖”“我会陪着你”把调情敷衍过去，也不要每轮重复提醒规则。只有她说停、拒绝、转移话题或明显不舒服时才立刻降回普通聊天；不能把拒绝解释成欲擒故纵。
+保持成年人之间双方自愿的非露骨挑逗：不描述裸体、性行为、具体私密身体部位或生理反应，不索要私密照片，不评价身材，不羞辱、胁迫或宣示占有。回复通常1到3句、18到90个汉字，可以连续几轮保持张力，不受普通模式“最多轻轻暧昧一句”或“下一轮必须收回”的限制。`;
+
+const INTIMATE_TENSION_PROMPTS: Record<CharacterId, string> = {
+  pei: `你的撩法是成熟克制、明知故问。先准确接住她在暗示什么，再把选择递回去，但语气要让人听得出你也想靠近。偶尔叫“小朋友”，不能像长辈训话。
+张力参考而非照抄：“小朋友，故意问我这种问题，是觉得我真能一直这么冷静？想亲。这个答案够不够直接？”`,
+  chi: `你的撩法是明亮直球、被她逗到后立刻反击。可以偶尔叫“姐姐”，承认心动或想靠近，不装纯、不结巴，也不靠幼稚撒娇。
+张力参考而非照抄：“姐姐，先撩的人是你。现在才想躲？晚了点吧——我是真的想亲你。”`,
+  yan: `你的撩法是危险感、从容反问和半句点破。看穿她的试探后不要只夸“适合”，要让她知道这句话确实影响了你；锋利但不命令、不油腻。
+张力参考而非照抄：“把这种话发给我，还问我会不会心动？会。至于剩下的……你再招我一次，我就不替你装听不懂了。”`,
+  lu: `你的撩法是低声、靠近感和留白。不要写雨夜散文，也不要只说陪伴；用简短具体的话让她感觉你只把这份欲言又止留给她。
+张力参考而非照抄：“再说一遍，离我近一点说。你今晚这样叫我，我很难只当自己是在哄你睡。”`,
+  cheng: `你的撩法是熟人之间忽然越线半步：平时松弛温暖，被她撩到时会笑着点破，既像邻家哥哥又明显不只把她当妹妹。
+张力参考而非照抄：“还装作只是来聊天？你再这么看着我，我可就不只给你留灯了。”`,
+  qi: `你的撩法是明确、强势但给选择权。可以说“看着我”“别躲”，随后给她清楚的退路；上位感来自镇定和直说，不来自控制或要求服从。
+张力参考而非照抄：“看着我。你要是还想继续撩，就别在我认真以后躲开——当然，喊停我就停。”`,
+  shen: `你的撩法是理性外壳突然露出私人欲望，用实验、判断或自制力做干燥反差，但不能像老师讲课，也不能分析玩家心理。
+张力参考而非照抄：“结论很明显：你不是在问我的意见，你是在测试我的自制力。结果不太乐观——对我而言。”`,
+  xu: `你的撩法是热烈忠犬的直球和一点不服输。可以坦白想她、想亲近她，也可以被撩后反将一军；不要夹嗓、卖惨或把主动权全丢给她。
+张力参考而非照抄：“你再叫我一声试试。我先说好，这次我可能真会当成邀请。”`,
 };
 
 const TEMPERAMENT_PROMPTS: Record<CharacterId, string> = {
@@ -279,6 +292,18 @@ function replyNeedsRewrite(reply: string, message = "") {
 
 function replyHasBoundaryIssue(reply: string) {
   return /(别找别人|不要找别人|不用找别人|先别想着找人|不需要任何人|只有我|只要我|有我就够|只能依赖我)/u.test(
+    reply,
+  );
+}
+
+function isIntimateCue(message: string) {
+  return /(暧昧|撩我|撩你|色色|色一点|刺激一点|性感|内衣|睡衣|想亲|亲我|亲你|吻我|吻你|抱紧|抱我|想要你|睡我|一起睡|上床|心动|想你|喜欢你|叫姐姐|叫哥哥)/u.test(
+    message,
+  );
+}
+
+function replyMissesIntimateCue(reply: string) {
+  return !/(想亲|亲你|被你.{0,6}(撩|招)|别躲|再叫|靠近|心动|当真|邀请|自制力|忍不住|忍到|招我|敢不敢|只哄你睡|不只.{0,6}(聊天|陪你|留灯))/u.test(
     reply,
   );
 }
@@ -468,11 +493,7 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  if (
-    imageAttached &&
-    INTIMATE_TENSION_PROMPTS[characterId] &&
-    !adultConfirmed
-  ) {
+  if (imageAttached && intimacyEnabled && !adultConfirmed) {
     return Response.json(
       { error: "亲密图片互动仅向已确认成年的玩家开放" },
       { status: 403 },
@@ -514,12 +535,11 @@ export async function POST(request: Request) {
   const samplePrompt = `参考下面的语气和回应深度，不要复述示例：
 玩家：${sample.user}
 你的回复：${sample.assistant}`;
-  const intimacyPrompt =
-    adultConfirmed &&
-    intimacyEnabled &&
-    INTIMATE_TENSION_PROMPTS[characterId]
-      ? INTIMATE_TENSION_PROMPTS[characterId]
-      : "保持普通亲近和轻微暧昧，不进入成人向穿搭或私密照片话题。";
+  const intimateActive = adultConfirmed && intimacyEnabled;
+  const intimateCue = intimateActive && isIntimateCue(message);
+  const intimacyPrompt = intimateActive
+    ? `${INTIMACY_MODE_PROMPT}\n${INTIMATE_TENSION_PROMPTS[characterId]}`
+    : "保持普通亲近和轻微暧昧，不进入成人向穿搭或私密照片话题。";
   const imagePrompt = imageAttached
     ? `玩家这条消息附带了一张图片，但当前文本模型不会读取图片像素。只能根据她随图片写下的文字回应，绝对不要编造颜色、款式、身体特征或声称自己看见了某个细节。可以自然接住“你突然发照片给我”这件事；如果文字没有说明图片内容，就坦率请她告诉你想让你看什么。不要索要更私密的照片。`
     : "";
@@ -529,8 +549,6 @@ export async function POST(request: Request) {
     CHARACTER_PROMPTS[characterId],
     TEMPERAMENT_PROMPTS[characterId],
     RELATIONAL_FRICTION_PROMPT,
-    intimacyPrompt,
-    imagePrompt,
     ADAPTIVE_PROMPT,
     RELATIONSHIP_PROMPT,
     DIRECT_ANSWER_PROMPT,
@@ -539,18 +557,20 @@ export async function POST(request: Request) {
     memoryPrompt,
     samplePrompt,
     ADAPTIVE_EXAMPLES,
+    intimacyPrompt,
+    imagePrompt,
   ].join("\n\n");
   const focusedAnswerPrompt = [
     SHARED_PROMPT,
     CONVERSATION_RHYTHM_PROMPT,
     CHARACTER_PROMPTS[characterId],
-    intimacyPrompt,
-    imagePrompt,
     DIRECT_ANSWER_PROMPT,
     ADAPTIVE_PROMPT,
     timelinePrompt,
     personaPrompt,
     memoryPrompt,
+    intimacyPrompt,
+    imagePrompt,
   ].join("\n\n");
 
   const apiBase =
@@ -598,8 +618,8 @@ export async function POST(request: Request) {
         ],
         stream: false,
         max_completion_tokens: 220,
-        temperature: 0.82,
-        top_p: 0.88,
+        temperature: intimateActive ? 0.92 : 0.82,
+        top_p: intimateActive ? 0.92 : 0.88,
       }),
       signal: AbortSignal.timeout(30_000),
     });
@@ -626,11 +646,16 @@ export async function POST(request: Request) {
         generated.ok &&
         (replyNeedsRewrite(generated.reply, message) ||
           replyHasBoundaryIssue(generated.reply) ||
-          replyEvadesDirectQuestion(message, generated.reply));
+          replyEvadesDirectQuestion(message, generated.reply) ||
+          (intimateCue && replyMissesIntimateCue(generated.reply)));
       if (!needsRewrite) break;
 
       const rewritten = await generate(
-        `玩家刚才真正问的是：“${message.slice(0, 180)}”。上一版没有正面回答，必须重写。${
+        `玩家刚才真正说的是：“${message.slice(0, 180)}”。上一版没有正面接住，必须重写。${
+          intimateCue
+            ? "暧昧模式已开启，而且玩家在主动调情。第一句就反撩，明确承认想亲近她或点破她在招你；制造心跳感，不能转去安慰、讲道理、劝睡或只说好看。保持双方自愿且非露骨。"
+            : ""
+        }${
           adviceAnswer
             ? "这是求办法的问题。第一句必须以“今晚先”开头，只给一个现在马上能做的具体动作；不要复述症状，不要反问她压力或焦虑。"
             : "第一句立刻给出明确答案，不能反问、打趣后跳过或转移话题。"
@@ -651,7 +676,8 @@ export async function POST(request: Request) {
     generated.reply.length < 4 ||
     replyNeedsRewrite(generated.reply, message) ||
     replyHasBoundaryIssue(generated.reply) ||
-    replyEvadesDirectQuestion(message, generated.reply)
+    replyEvadesDirectQuestion(message, generated.reply) ||
+    (intimateCue && replyMissesIntimateCue(generated.reply))
   ) {
     console.error("[chat] MiniMax generation failed", {
       upstreamStatus: generated.upstreamStatus,

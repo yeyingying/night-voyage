@@ -88,15 +88,26 @@ test("starts a fresh speech recognition pass for every voice message", async () 
 test("guards adult intimacy, local photo previews, and character boundaries", async () => {
   const { page, css, chatRoute } = await productSources();
 
-  assert.match(page, /new Set<CharacterId>\(\["yan", "chi"\]\)/);
+  assert.match(page, /new Set<CharacterId>\(CHARACTER_IDS\)/);
   assert.match(page, /ADULT_CONFIRMATION_KEY/);
   assert.match(page, /确认你已满 18 岁/);
+  assert.match(page, /八位男主都可以进入更有张力的暧昧聊天/);
   assert.match(page, /URL\.createObjectURL\(file\)/);
   assert.match(page, /照片只在本机/);
   assert.match(css, /\.adult-gate/);
   assert.match(css, /\.image-message-card/);
 
+  assert.match(chatRoute, /INTIMACY_MODE_PROMPT/);
   assert.match(chatRoute, /INTIMATE_TENSION_PROMPTS/);
+  assert.match(chatRoute, /pei:\s*`你的撩法/);
+  assert.match(chatRoute, /lu:\s*`你的撩法/);
+  assert.match(chatRoute, /qi:\s*`你的撩法/);
+  assert.match(chatRoute, /xu:\s*`你的撩法/);
+  assert.match(chatRoute, /intimateActive \? 0\.92 : 0\.82/);
+  assert.match(chatRoute, /可以连续几轮保持张力/);
+  assert.match(chatRoute, /isIntimateCue/);
+  assert.match(chatRoute, /replyMissesIntimateCue/);
+  assert.match(chatRoute, /第一句就反撩/);
   assert.match(chatRoute, /RELATIONAL_FRICTION_PROMPT/);
   assert.match(chatRoute, /不使用冷暴力/);
   assert.match(chatRoute, /当前文本模型不会读取图片像素/);
@@ -175,7 +186,10 @@ test("keeps chat copy and all character voices conversational", async () => {
   assert.match(chatRoute, /通常写1到2句、12到65个汉字/);
   assert.match(chatRoute, /scriptedCadence/);
   assert.match(chatRoute, /max_completion_tokens:\s*220/);
-  assert.match(chatRoute, /temperature:\s*0\.82/);
+  assert.match(
+    chatRoute,
+    /temperature:\s*intimateActive \? 0\.92 : 0\.82/,
+  );
   assert.match(personaEngine, /Record<\s*CharacterId,/);
   assert.match(personaEngine, /pei:\s*conversationalVoice/);
   assert.match(personaEngine, /lu:\s*conversationalVoice/);
@@ -213,7 +227,7 @@ test("answers the player's actual question instead of masking model failures", a
   assert.match(chatRoute, /focusedAnswerPrompt/);
   assert.match(chatRoute, /isDirectQuestionMessage/);
   assert.match(chatRoute, /rewriteAttempt < 2/);
-  assert.match(chatRoute, /上一版没有正面回答/);
+  assert.match(chatRoute, /上一版没有正面接住/);
   assert.match(chatRoute, /喜欢你\|不喜欢/);
   assert.match(chatRoute, /我们先来分析一下/);
   assert.match(chatRoute, /isAdviceQuestion/);

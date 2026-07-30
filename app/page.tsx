@@ -438,7 +438,7 @@ const CHARACTERS: Record<CharacterId, CharacterProfile> = {
 };
 
 const CHARACTER_IDS = Object.keys(CHARACTERS) as CharacterId[];
-const INTIMATE_CHARACTER_IDS = new Set<CharacterId>(["yan", "chi"]);
+const INTIMATE_CHARACTER_IDS = new Set<CharacterId>(CHARACTER_IDS);
 const ADULT_CONFIRMATION_KEY = "night-voyage-adult-intimacy-confirmed";
 const INTIMACY_ENABLED_KEY = "night-voyage-intimacy-enabled";
 const PROACTIVE_ENABLED_KEY = "night-voyage-proactive-enabled";
@@ -2103,7 +2103,7 @@ export default function Home() {
 
   function openPhotoPicker() {
     setImageNotice("");
-    if (INTIMATE_CHARACTER_IDS.has(selectedId) && !adultConfirmed) {
+    if (intimacyEnabled && !adultConfirmed) {
       setAdultGateIntent("photo");
       setAdultGateOpen(true);
       return;
@@ -3240,7 +3240,7 @@ export default function Home() {
             <span>18+ · 亲密语气</span>
             <h2 id="adult-gate-title">确认你已满 18 岁</h2>
             <p>
-              谢临渊和迟曜可以进入更有张力的暧昧聊天：会试探、顶嘴，也会尊重你说停。内容不会进入露骨描写。
+              八位男主都可以进入更有张力的暧昧聊天：会主动反撩、承认心动，也会尊重你说停。内容不会进入露骨描写。
             </p>
             <small>
               照片只在本机显示，当前模型不会读取图片细节，只会根据你随照片写下的话回应。
