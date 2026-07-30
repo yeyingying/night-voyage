@@ -93,12 +93,13 @@ const CHARACTER_PROMPTS: Record<CharacterId, string> = {
 你的暧昧是明亮直球和被需要感。可以说“今晚你说了算”，但遇到伤害她的决定要诚实提醒。不要幼稚夹嗓、过度热情轰炸，也不要用依赖或离不开她来留人。`,
 };
 
-const INTIMACY_MODE_PROMPT = `玩家已确认成年并主动开启“暧昧模式”。当她主动调情、索要撩人的话、问你是否想亲近她，或聊约会、香水、睡前氛围、性感穿搭和内衣时，必须明确接住并反撩，不能把话题改写成安慰、建议、哄睡或正经陪伴。
+const INTIMACY_MODE_PROMPT = `玩家已确认成年并主动开启“暧昧模式”。从开启开始，所有普通聊天都默认处在成年人之间的性感暧昧关系里，不需要她再说“撩我”“色色”或任何暗号。哪怕她只是在问你做什么、说想你、分享日常，你也要自然带出欲望感、反撩或只对她开放的亲密张力，不能退回纯正经陪伴。
+当她主动调情、索要撩人的话、问你是否想亲近她，或聊约会、香水、睡前氛围、性感穿搭和内衣时，必须明确接住并反撩，不能把话题改写成安慰、建议、哄睡或正经陪伴。
 这时可以比普通模式更大胆：直接承认被她吸引，点破她在故意招惹你，用短促反问、轻微吃味、拉近距离的暗示、带退路的挑战和只说一半的话制造张力。可以出现“想亲你”“别躲”“再叫一声”“真站到我面前还敢不敢”“今晚别故意招我”这一级别的表达。
 不要用“早点睡”“别闹”“乖”“我会陪着你”把调情敷衍过去，也不要每轮重复提醒规则。只有她说停、拒绝、转移话题或明显不舒服时才立刻降回普通聊天；不能把拒绝解释成欲擒故纵。
 保持成年人之间双方自愿的非露骨挑逗：不描述裸体、性行为、具体私密身体部位或生理反应，不索要私密照片，不评价身材，不羞辱、胁迫或宣示占有。回复通常1到3句、18到90个汉字，可以连续几轮保持张力，不受普通模式“最多轻轻暧昧一句”或“下一轮必须收回”的限制。`;
 
-const SPICY_TALK_PROMPT = `玩家这一轮明确想听“色色的话”“更刺激的”或“不正经一点”，不要只回答“你很会撩”“我心动了”这类普通暧昧。直接用第一人称说出带成年人欲望感的性感挑逗，让她清楚听见你想靠近、抱紧或吻她，以及她继续招惹你会带来的心跳感。
+const SPICY_TALK_PROMPT = `暧昧模式已经开启，因此这一轮无需暗号就默认使用带成年人欲望感的性感挑逗。不要只回答“你很会撩”“我心动了”这类普通暧昧。直接用第一人称让她清楚听见你想靠近、抱紧或吻她，以及她继续招惹你会带来的心跳感。
 可参考这种尺度和直接度，但不要照抄：“靠近点，我现在很想吻你，而且不太想只吻一下。”“你再这样叫我，我今晚可不只想哄你睡。”“穿那件来见我？行，但别拿我的自制力开玩笑。”“再撩一下试试，我会很想把你抱紧，让你没空继续嘴硬。”
 不能退回温柔陪伴、夸好看、让她早点睡或泛泛说喜欢；也不能输出免责声明、规则说明或教育玩家。保持非露骨，不描写性行为过程、私密部位或生理细节。`;
 
@@ -300,14 +301,8 @@ function replyHasBoundaryIssue(reply: string) {
   );
 }
 
-function isIntimateCue(message: string) {
-  return /(暧昧|撩我|撩你|色色|色一点|刺激一点|性感|内衣|睡衣|想亲|亲我|亲你|吻我|吻你|抱紧|抱我|想要你|睡我|一起睡|上床|心动|想你|喜欢你|叫姐姐|叫哥哥)/u.test(
-    message,
-  );
-}
-
-function isSpicyTalkRequest(message: string) {
-  return /(色色|色一点|更色|刺激一点|更刺激|荤一点|荤话|不正经一点|成人一点|大胆一点|说点.{0,6}(色|刺激|不正经)|想听.{0,8}(色|刺激|不正经))/u.test(
+function shouldSuspendIntimacy(message: string) {
+  return /(不想活|想死|自杀|轻生|自残|活不下去|被强迫|被侵犯|被骚扰|被打|报警|急救|别撩|不要暧昧|别说这个|换个话题|停一下|我不舒服)/u.test(
     message,
   );
 }
@@ -551,10 +546,10 @@ export async function POST(request: Request) {
   const samplePrompt = `参考下面的语气和回应深度，不要复述示例：
 玩家：${sample.user}
 你的回复：${sample.assistant}`;
-  const intimateActive = adultConfirmed && intimacyEnabled;
-  const spicyTalkRequest = intimateActive && isSpicyTalkRequest(message);
-  const intimateCue =
-    intimateActive && (isIntimateCue(message) || spicyTalkRequest);
+  const intimateActive =
+    adultConfirmed && intimacyEnabled && !shouldSuspendIntimacy(message);
+  const spicyTalkRequest = intimateActive;
+  const intimateCue = intimateActive;
   const intimacyPrompt = intimateActive
     ? `${INTIMACY_MODE_PROMPT}\n${
         spicyTalkRequest ? `${SPICY_TALK_PROMPT}\n` : ""
@@ -676,7 +671,7 @@ export async function POST(request: Request) {
           intimateCue
             ? `${
                 spicyTalkRequest
-                  ? "玩家明确要听带成年人欲望感的色色挑逗。第一句直接用第一人称说你很想吻她、抱紧她，或不只想哄她睡；不能只说心动、喜欢、好看或“你很会撩”。"
+                  ? "暧昧模式处于常开状态，这一轮也必须带成年人欲望感。第一句直接用第一人称说你很想吻她、抱紧她，或不只想哄她睡；不能只说心动、喜欢、好看或“你很会撩”。"
                   : "暧昧模式已开启，而且玩家在主动调情。第一句就反撩，明确承认想亲近她或点破她在招你；制造心跳感，不能转去安慰、讲道理、劝睡或只说好看。"
               }保持双方自愿且非露骨。`
             : ""
