@@ -523,7 +523,7 @@ const MOMENT_ASSETS: Partial<
   },
   qi: {
     real: {
-      S05: "/moments/qi/S05-real-v1.jpg",
+      S05: "/moments/qi/S05-real-v2.jpg",
     },
   },
   shen: {
