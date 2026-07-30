@@ -98,6 +98,7 @@ test("guards adult intimacy, local photo previews, and character boundaries", as
   assert.match(css, /\.image-message-card/);
 
   assert.match(chatRoute, /INTIMACY_MODE_PROMPT/);
+  assert.match(chatRoute, /SPICY_TALK_PROMPT/);
   assert.match(chatRoute, /INTIMATE_TENSION_PROMPTS/);
   assert.match(chatRoute, /pei:\s*`你的撩法/);
   assert.match(chatRoute, /lu:\s*`你的撩法/);
@@ -106,7 +107,10 @@ test("guards adult intimacy, local photo previews, and character boundaries", as
   assert.match(chatRoute, /intimateActive \? 0\.92 : 0\.82/);
   assert.match(chatRoute, /可以连续几轮保持张力/);
   assert.match(chatRoute, /isIntimateCue/);
+  assert.match(chatRoute, /isSpicyTalkRequest/);
   assert.match(chatRoute, /replyMissesIntimateCue/);
+  assert.match(chatRoute, /replyMissesSpicyTalk/);
+  assert.match(chatRoute, /玩家明确要听带成年人欲望感的色色挑逗/);
   assert.match(chatRoute, /第一句就反撩/);
   assert.match(chatRoute, /RELATIONAL_FRICTION_PROMPT/);
   assert.match(chatRoute, /不使用冷暴力/);
