@@ -45,6 +45,7 @@ type VisualStyle = "manhwa" | "real";
 type SleepMode = "settle" | "body" | "story";
 type VoiceProvider = "auto" | "natural" | "device";
 type AdultGateIntent = "intimacy" | "photo";
+type MomentSceneId = "S01" | "S02" | "S03" | "S04" | "S05" | "S06";
 type VoiceCaptureState =
   | "idle"
   | "requesting"
@@ -67,6 +68,15 @@ type Memory = {
   id: number;
   text: string;
   date: string;
+};
+type MomentScene = {
+  id: MomentSceneId;
+  title: string;
+  cue: string;
+  lockedCopy: string;
+};
+type ActiveMoment = MomentScene & {
+  image: string;
 };
 type CharacterProfile = {
   id: CharacterId;
@@ -438,6 +448,95 @@ const CHARACTERS: Record<CharacterId, CharacterProfile> = {
 };
 
 const CHARACTER_IDS = Object.keys(CHARACTERS) as CharacterId[];
+
+const MOMENT_SCENES: MomentScene[] = [
+  {
+    id: "S01",
+    title: "第一次看向你",
+    cue: "初见",
+    lockedCopy: "选择他后解锁",
+  },
+  {
+    id: "S02",
+    title: "今天也有自己的生活",
+    cue: "日常",
+    lockedCopy: "等他主动分享",
+  },
+  {
+    id: "S03",
+    title: "被你逗笑了",
+    cue: "开心",
+    lockedCopy: "再熟一点就会看见",
+  },
+  {
+    id: "S04",
+    title: "他也会有点在意",
+    cue: "吃醋",
+    lockedCopy: "关系变化后解锁",
+  },
+  {
+    id: "S05",
+    title: "今晚先靠近一点",
+    cue: "安慰",
+    lockedCopy: "一次深夜谈心后解锁",
+  },
+  {
+    id: "S06",
+    title: "晚安之前",
+    cue: "睡前",
+    lockedCopy: "完成一次陪睡后解锁",
+  },
+];
+
+const MOMENT_ASSETS: Partial<
+  Record<
+    CharacterId,
+    Partial<
+      Record<VisualStyle, Partial<Record<MomentSceneId, string>>>
+    >
+  >
+> = {
+  pei: {
+    real: {
+      S05: "/moments/pei/S05-real-v1.jpg",
+    },
+  },
+  chi: {
+    real: {
+      S05: "/moments/chi/S05-real-v1.jpg",
+    },
+  },
+  yan: {
+    real: {
+      S05: "/moments/yan/S05-real-v1.jpg",
+    },
+  },
+  lu: {
+    real: {
+      S05: "/moments/lu/S05-real-v1.jpg",
+    },
+  },
+  cheng: {
+    real: {
+      S05: "/moments/cheng/S05-real-v1.jpg",
+    },
+  },
+  qi: {
+    real: {
+      S05: "/moments/qi/S05-real-v1.jpg",
+    },
+  },
+  shen: {
+    real: {
+      S05: "/moments/shen/S05-real-v1.jpg",
+    },
+  },
+  xu: {
+    real: {
+      S05: "/moments/xu/S05-real-v1.jpg",
+    },
+  },
+};
 const INTIMATE_CHARACTER_IDS = new Set<CharacterId>(CHARACTER_IDS);
 const ADULT_CONFIRMATION_KEY = "night-voyage-adult-intimacy-confirmed";
 const INTIMACY_ENABLED_KEY = "night-voyage-intimacy-enabled";
@@ -769,6 +868,9 @@ export default function Home() {
   const [secondsLeft, setSecondsLeft] = useState(12 * 60);
   const [sleepLine, setSleepLine] = useState(0);
   const [memoryDraft, setMemoryDraft] = useState("");
+  const [activeMoment, setActiveMoment] = useState<ActiveMoment | null>(
+    null,
+  );
   const [voiceOn, setVoiceOn] = useState(true);
   const [voiceLoading, setVoiceLoading] = useState(false);
   const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>("auto");
@@ -862,6 +964,22 @@ export default function Home() {
   );
   const characterImage =
     visualStyle === "real" ? character.realImage : character.image;
+  const momentCards = useMemo(
+    () =>
+      MOMENT_SCENES.map((scene) => {
+        const image =
+          scene.id === "S01"
+            ? characterImage
+            : MOMENT_ASSETS[selectedId]?.[visualStyle]?.[scene.id];
+        return { ...scene, image };
+      }),
+    [characterImage, selectedId, visualStyle],
+  );
+  const visibleMomentCount = momentCards.filter(
+    (moment) => moment.image,
+  ).length;
+  const sleepCharacterImage =
+    MOMENT_ASSETS[selectedId]?.[visualStyle]?.S06 ?? characterImage;
   const personaSnapshot = useMemo(
     () =>
       getPersonaSnapshot(
@@ -887,6 +1005,7 @@ export default function Home() {
     "--character-accent": character.accent,
     "--character-soft": character.accentSoft,
     "--character-image": `url("${characterImage}")`,
+    "--sleep-character-image": `url("${sleepCharacterImage}")`,
   } as CSSProperties;
 
   useEffect(() => {
@@ -2917,10 +3036,68 @@ export default function Home() {
           {tab === "memory" && (
             <section className="memory-view">
               <div className="page-intro">
-                <span>记住的小事</span>
-                <h1>他们记得的你</h1>
-                <p>这里只保存你愿意留下的事，想删的时候随时可以删。</p>
+                <span>你们之间发生过的事</span>
+                <h1>记忆</h1>
+                <p>
+                  照片不会一次摆满。聊天、闹别扭和互道晚安时，它们会慢慢出现。
+                </p>
               </div>
+              <section className="moment-library" aria-label="角色照片记忆">
+                <div className="moment-library-heading">
+                  <div>
+                    <span>{character.name}的瞬间</span>
+                    <strong>已经遇见 {visibleMomentCount} / 6</strong>
+                  </div>
+                  <small>
+                    {visualStyle === "real" ? "真人摄影" : "韩漫画面"}
+                  </small>
+                </div>
+                <div className="moment-grid">
+                  {momentCards.map((moment, index) =>
+                    moment.image ? (
+                      <button
+                        className={`moment-card unlocked${
+                          index === 0 ? " lead" : ""
+                        }`}
+                        type="button"
+                        key={moment.id}
+                        onClick={() =>
+                          setActiveMoment({
+                            id: moment.id,
+                            title: moment.title,
+                            cue: moment.cue,
+                            lockedCopy: moment.lockedCopy,
+                            image: moment.image as string,
+                          })
+                        }
+                        aria-label={`查看${character.name}的照片：${moment.title}`}
+                      >
+                        <img src={moment.image} alt="" />
+                        <span className="moment-card-shade" />
+                        <span className="moment-card-copy">
+                          <small>{moment.cue}</small>
+                          <strong>{moment.title}</strong>
+                        </span>
+                      </button>
+                    ) : (
+                      <article
+                        className={`moment-card locked${
+                          index === 0 ? " lead" : ""
+                        }`}
+                        key={moment.id}
+                      >
+                        <span className="moment-lock" aria-hidden="true">
+                          ◇
+                        </span>
+                        <span className="moment-card-copy">
+                          <small>{moment.cue}</small>
+                          <strong>{moment.lockedCopy}</strong>
+                        </span>
+                      </article>
+                    ),
+                  )}
+                </div>
+              </section>
               <form className="memory-form" onSubmit={addMemory}>
                 <label htmlFor="memory-input">
                   希望{character.name}记住什么？
@@ -2937,6 +3114,10 @@ export default function Home() {
                   </button>
                 </div>
               </form>
+              <div className="memory-section-label">
+                <span>他记住的你</span>
+                <small>{memories.length} 件小事</small>
+              </div>
               <div className="memory-list">
                 {memories.map((memory) => (
                   <article key={memory.id}>
@@ -3127,6 +3308,31 @@ export default function Home() {
           ))}
         </nav>
       </section>
+
+      {activeMoment && (
+        <section
+          className="moment-viewer"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${character.name}的照片：${activeMoment.title}`}
+          style={characterStyle}
+        >
+          <button
+            className="moment-viewer-close"
+            type="button"
+            onClick={() => setActiveMoment(null)}
+            aria-label="关闭照片"
+          >
+            ← 返回记忆
+          </button>
+          <img src={activeMoment.image} alt={`${character.name}，${activeMoment.title}`} />
+          <div className="moment-viewer-copy">
+            <small>{activeMoment.cue} · {character.name}</small>
+            <h2>{activeMoment.title}</h2>
+            <p>这张照片已经收进你们的记忆。</p>
+          </div>
+        </section>
+      )}
 
       {sleepOpen && (
         <section
